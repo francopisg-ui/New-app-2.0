@@ -37,8 +37,8 @@
   let zoomIndicatorTimer = null;
 
   // Secret reveal config
-  const SECRET_REVEAL_THRESHOLD = 7;
-  const SECRET_FULL_OPACITY_ZOOM = 300;
+  const SECRET_REVEAL_THRESHOLD = 3;
+  const SECRET_FULL_OPACITY_ZOOM = 15;
 
   // Pixel reveal config
   const PIXEL_FONT = {
