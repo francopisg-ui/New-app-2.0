@@ -624,8 +624,8 @@
       zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
     }
 
-    // Overlay secret word at viewport center when zoomed past 50%
-    if (viewerZoom >= viewerMaxZoom * 0.5) {
+    // Overlay secret word at viewport center when zoomed past 80x
+    if (viewerZoom >= 80) {
       renderSecretOverlay(drawX, drawY, scale, cw, ch);
     }
 
