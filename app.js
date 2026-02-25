@@ -618,50 +618,47 @@
     const imageData = captureCtx.getImageData(0, 0, imgW, imgH);
     const data = imageData.data;
 
-    // Sample colors from the surrounding area for the "on" pixels
-    // We'll use contrasting but photo-realistic colors
-    // Sample the average color of the center region
-    const sampleRadius = 30;
-    let avgR = 0, avgG = 0, avgB = 0, count = 0;
-    for (let sy = centerY - sampleRadius; sy < centerY + sampleRadius; sy++) {
-      for (let sx = centerX - sampleRadius; sx < centerX + sampleRadius; sx++) {
-        if (sx >= 0 && sx < imgW && sy >= 0 && sy < imgH) {
-          const idx = (sy * imgW + sx) * 4;
-          avgR += data[idx];
-          avgG += data[idx + 1];
-          avgB += data[idx + 2];
-          count++;
-        }
-      }
-    }
-    avgR = Math.floor(avgR / count);
-    avgG = Math.floor(avgG / count);
-    avgB = Math.floor(avgB / count);
+    // Per-pixel adaptive embedding: each text pixel samples its 3x3 neighbors
+    // and shifts slightly to blend with surroundings
+    const EMBED_SHIFT = 65;
 
-    // Create contrasting "letter" color — shift enough to be visible when zoomed
-    const brightness = (avgR + avgG + avgB) / 3;
-    let letterR, letterG, letterB;
-    if (brightness > 128) {
-      letterR = Math.max(0, avgR - 90);
-      letterG = Math.max(0, avgG - 85);
-      letterB = Math.max(0, avgB - 80);
-    } else {
-      letterR = Math.min(255, avgR + 90);
-      letterG = Math.min(255, avgG + 85);
-      letterB = Math.min(255, avgB + 80);
-    }
-
-    // Write the word grid into the image
+    // Write the word grid into the image with per-pixel neighbor blending
     for (let gy = 0; gy < gridH; gy++) {
       for (let gx = 0; gx < gridW; gx++) {
         const px = startX + gx;
         const py = startY + gy;
         if (px >= 0 && px < imgW && py >= 0 && py < imgH) {
-          const idx = (py * imgW + px) * 4;
           if (wordGrid[gy][gx] === 1) {
-            data[idx] = letterR;
-            data[idx + 1] = letterG;
-            data[idx + 2] = letterB;
+            // Average the 3x3 neighborhood around this pixel
+            let rSum = 0, gSum = 0, bSum = 0, count = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+              for (let dx = -1; dx <= 1; dx++) {
+                const nx = px + dx;
+                const ny = py + dy;
+                if (nx >= 0 && nx < imgW && ny >= 0 && ny < imgH) {
+                  const nIdx = (ny * imgW + nx) * 4;
+                  rSum += data[nIdx];
+                  gSum += data[nIdx + 1];
+                  bSum += data[nIdx + 2];
+                  count++;
+                }
+              }
+            }
+            const avgR = Math.round(rSum / count);
+            const avgG = Math.round(gSum / count);
+            const avgB = Math.round(bSum / count);
+            const brightness = (avgR + avgG + avgB) / 3;
+
+            const idx = (py * imgW + px) * 4;
+            if (brightness > 128) {
+              data[idx] = Math.max(0, avgR - EMBED_SHIFT);
+              data[idx + 1] = Math.max(0, avgG - EMBED_SHIFT);
+              data[idx + 2] = Math.max(0, avgB - EMBED_SHIFT);
+            } else {
+              data[idx] = Math.min(255, avgR + EMBED_SHIFT);
+              data[idx + 1] = Math.min(255, avgG + EMBED_SHIFT);
+              data[idx + 2] = Math.min(255, avgB + EMBED_SHIFT);
+            }
           }
           // "off" pixels keep their original color
         }
@@ -826,20 +823,43 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    const SHIFT = 160; // strong contrast for legibility
+    const SHIFT = 65; // moderate shift for blend-in legibility
     const gap = scale > 20 ? 1 : 0;
     const outlineSize = Math.max(1, Math.round(scale * 0.25));
 
     zoomCtx.globalAlpha = opacity;
 
-    // Pass 1: draw dark outline behind each letter pixel for contrast
+    // Helper: average a 3x3 neighborhood around (cx, cy) in the original image
+    function avg3x3(cx, cy) {
+      let rSum = 0, gSum = 0, bSum = 0, count = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (nx >= 0 && nx < iw && ny >= 0 && ny < ih) {
+            const idx = (ny * iw + nx) * 4;
+            rSum += data[idx];
+            gSum += data[idx + 1];
+            bSum += data[idx + 2];
+            count++;
+          }
+        }
+      }
+      return {
+        r: Math.round(rSum / count),
+        g: Math.round(gSum / count),
+        b: Math.round(bSum / count)
+      };
+    }
+
+    // Pass 1: very faint outline behind each letter pixel (subtle hint)
     for (let gy = 0; gy < gridH; gy++) {
       for (let gx = 0; gx < gridW; gx++) {
         if (cachedWordGrid[gy][gx] === 1) {
           const px = startX + gx;
           const py = startY + gy;
           if (px >= 0 && px < iw && py >= 0 && py < ih) {
-            zoomCtx.fillStyle = 'rgba(0,0,0,0.45)';
+            zoomCtx.fillStyle = 'rgba(0,0,0,0.08)';
             zoomCtx.fillRect(
               drawX + px * scale - outlineSize,
               drawY + py * scale - outlineSize,
@@ -851,30 +871,27 @@
       }
     }
 
-    // Pass 2: draw the colored letter pixels on top
+    // Pass 2: draw letter pixels using adaptive shade from 3x3 neighbors
     for (let gy = 0; gy < gridH; gy++) {
       for (let gx = 0; gx < gridW; gx++) {
         if (cachedWordGrid[gy][gx] === 1) {
           const px = startX + gx;
           const py = startY + gy;
           if (px >= 0 && px < iw && py >= 0 && py < ih) {
-            const idx = (py * iw + px) * 4;
-            const r = data[idx];
-            const g = data[idx + 1];
-            const b = data[idx + 2];
-            const brightness = (r + g + b) / 3;
+            const avg = avg3x3(px, py);
+            const brightness = (avg.r + avg.g + avg.b) / 3;
 
             let nr, ng, nb;
-            if (brightness > 100) {
-              // Darken on light/mid backgrounds — push toward white letters on dark outline
-              nr = 255;
-              ng = 255;
-              nb = 255;
+            if (brightness > 128) {
+              // Light area — shift slightly darker
+              nr = Math.max(0, avg.r - SHIFT);
+              ng = Math.max(0, avg.g - SHIFT);
+              nb = Math.max(0, avg.b - SHIFT);
             } else {
-              // Lighten on dark backgrounds
-              nr = Math.min(255, r + SHIFT);
-              ng = Math.min(255, g + SHIFT);
-              nb = Math.min(255, b + SHIFT);
+              // Dark area — shift slightly lighter
+              nr = Math.min(255, avg.r + SHIFT);
+              ng = Math.min(255, avg.g + SHIFT);
+              nb = Math.min(255, avg.b + SHIFT);
             }
 
             zoomCtx.fillStyle = `rgb(${nr},${ng},${nb})`;
