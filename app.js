@@ -727,13 +727,13 @@
     const brightness = (avgR + avgG + avgB) / 3;
     let letterR, letterG, letterB;
     if (brightness > 128) {
-      letterR = Math.max(0, avgR - 80);
-      letterG = Math.max(0, avgG - 75);
-      letterB = Math.max(0, avgB - 70);
+      letterR = Math.max(0, avgR - 105);
+      letterG = Math.max(0, avgG - 100);
+      letterB = Math.max(0, avgB - 95);
     } else {
-      letterR = Math.min(255, avgR + 80);
-      letterG = Math.min(255, avgG + 75);
-      letterB = Math.min(255, avgB + 70);
+      letterR = Math.min(255, avgR + 105);
+      letterG = Math.min(255, avgG + 100);
+      letterB = Math.min(255, avgB + 95);
     }
 
     const gap = scale > 20 ? 1 : 0;
