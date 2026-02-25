@@ -34,8 +34,8 @@
   let secretLocked = false;
   let secretLockImgX = 0;
   let secretLockImgY = 0;
-  const SECRET_REVEAL_THRESHOLD = 80;
-  const SECRET_FULL_OPACITY_ZOOM = 200; // fully visible by this zoom level
+  const SECRET_REVEAL_THRESHOLD = 15;
+  const SECRET_FULL_OPACITY_ZOOM = 300; // very slow fade from 15x to 300x
 
   // Pixel reveal config
   const PIXEL_FONT = {
