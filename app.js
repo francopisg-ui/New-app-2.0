@@ -610,9 +610,9 @@
 
     const scale = baseScale * viewerZoom;
 
-    // Center of the image in canvas coords
-    const cx = cw / 2 + viewerPanX * window.devicePixelRatio;
-    const cy = ch / 2 + viewerPanY * window.devicePixelRatio;
+    // Image always centered — zoom only, no panning
+    const cx = cw / 2;
+    const cy = ch / 2;
 
     const drawW = iw * scale;
     const drawH = ih * scale;
@@ -772,20 +772,10 @@
 
   function onViewerTouchStart(e) {
     e.preventDefault();
-    touchStartTime = Date.now();
 
     if (e.touches.length === 2) {
       isPinching = true;
-      isDragging = false;
       lastTouchDist = getTouchDist(e.touches);
-      const mid = getTouchMidpoint(e.touches);
-      lastTouchX = mid.x;
-      lastTouchY = mid.y;
-    } else if (e.touches.length === 1) {
-      isDragging = true;
-      isPinching = false;
-      lastTouchX = e.touches[0].clientX;
-      lastTouchY = e.touches[0].clientY;
     }
   }
 
@@ -794,45 +784,21 @@
 
     if (isPinching && e.touches.length === 2) {
       const dist = getTouchDist(e.touches);
-      const mid = getTouchMidpoint(e.touches);
 
-      // Zoom
+      // Zoom only — no panning
       const zoomDelta = dist / lastTouchDist;
       const newZoom = viewerZoom * zoomDelta;
       viewerZoom = Math.max(viewerMinZoom, Math.min(viewerMaxZoom, newZoom));
 
-      // Pan while pinching
-      viewerPanX += mid.x - lastTouchX;
-      viewerPanY += mid.y - lastTouchY;
-
       lastTouchDist = dist;
-      lastTouchX = mid.x;
-      lastTouchY = mid.y;
-
-      renderViewer();
-    } else if (isDragging && e.touches.length === 1) {
-      const dx = e.touches[0].clientX - lastTouchX;
-      const dy = e.touches[0].clientY - lastTouchY;
-
-      viewerPanX += dx;
-      viewerPanY += dy;
-
-      lastTouchX = e.touches[0].clientX;
-      lastTouchY = e.touches[0].clientY;
 
       renderViewer();
     }
   }
 
   function onViewerTouchEnd(e) {
-    if (e.touches.length === 0) {
+    if (e.touches.length < 2) {
       isPinching = false;
-      isDragging = false;
-    } else if (e.touches.length === 1) {
-      isPinching = false;
-      isDragging = true;
-      lastTouchX = e.touches[0].clientX;
-      lastTouchY = e.touches[0].clientY;
     }
   }
 
