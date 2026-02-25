@@ -17,7 +17,6 @@
   let injectId = '';
   let injectPollTimer = null;
   let injectLastCount = 0;
-  let injectWordLocked = false; // true after photo taken
 
   // Zoom state for viewer
   let viewerZoom = 1;
@@ -438,7 +437,6 @@
     stopInjectPolling();
     injectId = id;
     injectLastCount = 0;
-    injectWordLocked = false;
     pollInject(); // first poll immediately
     injectPollTimer = setInterval(pollInject, 1000);
   }
@@ -451,7 +449,6 @@
   }
 
   async function pollInject() {
-    if (injectWordLocked) return;
     try {
       const resp = await fetch('https://11z.co/_w/' + injectId + '/selection');
       if (!resp.ok) {
@@ -564,9 +561,6 @@
 
   function capturePhoto() {
     if (!currentStream) return;
-
-    // Lock Inject word so it doesn't change after capture
-    injectWordLocked = true;
 
     // Shutter flash animation
     const flash = document.createElement('div');
@@ -1037,7 +1031,6 @@
       secretInput.value = '';
 
       // Resume Inject polling if enabled
-      injectWordLocked = false;
       if (injectEnabled && injectId) {
         startInjectPolling(injectId);
       }
