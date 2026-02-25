@@ -275,6 +275,11 @@ html, body {
   background-position: center;
 }
 
+.thumbnail-preview.has-photo {
+  border-color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+}
+
 /* Shutter button */
 .shutter-btn {
   width: 72px;
@@ -374,17 +379,6 @@ html, body {
 
 .zoom-indicator.visible {
   opacity: 1;
-}
-
-.viewer-hint {
-  position: absolute;
-  bottom: calc(env(safe-area-inset-bottom, 20px) + 30px);
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
-  z-index: 10;
-  transition: opacity 1s;
 }
 
 /* Shutter animation */

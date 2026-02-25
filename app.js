@@ -352,7 +352,6 @@
   const captureCtx = captureCanvas.getContext('2d');
   const backBtn = document.getElementById('back-btn');
   const zoomIndicator = document.getElementById('zoom-indicator');
-  const viewerHint = document.getElementById('viewer-hint');
   const zoomBtns = document.querySelectorAll('.zoom-btn');
 
   // --- Screen Management ---
@@ -463,22 +462,9 @@
       // Store image data for pixel sampling
       capturedImageData = captureCtx.getImageData(0, 0, w, h);
 
-      // Update thumbnail
+      // Update thumbnail in bottom-left — stay on camera
       thumbnailPreview.style.backgroundImage = `url(${dataURL})`;
-
-      // Reset zoom state
-      viewerZoom = 1;
-      viewerPanX = 0;
-      viewerPanY = 0;
-
-      // Switch to viewer
-      showScreen(viewerScreen);
-      resizeViewerCanvas();
-      renderViewer();
-
-      // Show hint
-      viewerHint.style.opacity = '1';
-      setTimeout(() => { viewerHint.style.opacity = '0'; }, 2500);
+      thumbnailPreview.classList.add('has-photo');
     };
     capturedImage.src = dataURL;
   }
@@ -772,6 +758,20 @@
     };
   }
 
+  // --- Thumbnail opens viewer ---
+  thumbnailPreview.addEventListener('click', () => {
+    if (!capturedImage || !thumbnailPreview.classList.contains('has-photo')) return;
+
+    // Reset zoom state
+    viewerZoom = 1;
+    viewerPanX = 0;
+    viewerPanY = 0;
+
+    showScreen(viewerScreen);
+    resizeViewerCanvas();
+    renderViewer();
+  });
+
   // --- Back Button ---
   backBtn.addEventListener('click', () => {
     showScreen(cameraScreen);
@@ -782,6 +782,46 @@
     if (viewerScreen.classList.contains('active')) {
       resizeViewerCanvas();
       renderViewer();
+    }
+  });
+
+  // --- 5-Tap Rapid Reset ---
+  let tapTimestamps = [];
+  const TAP_RESET_COUNT = 5;
+  const TAP_RESET_WINDOW = 1500; // 5 taps within 1.5 seconds
+
+  document.addEventListener('touchend', (e) => {
+    // Only count single-finger taps (not pinch ends)
+    if (e.touches.length > 0) return;
+
+    const now = Date.now();
+    tapTimestamps.push(now);
+
+    // Keep only recent taps
+    tapTimestamps = tapTimestamps.filter(t => now - t < TAP_RESET_WINDOW);
+
+    if (tapTimestamps.length >= TAP_RESET_COUNT) {
+      tapTimestamps = [];
+
+      // Stop camera
+      if (currentStream) {
+        currentStream.getTracks().forEach(t => t.stop());
+        currentStream = null;
+      }
+
+      // Reset state
+      secretWord = '';
+      capturedImage = null;
+      capturedImageData = null;
+      viewerZoom = 1;
+      viewerPanX = 0;
+      viewerPanY = 0;
+      thumbnailPreview.style.backgroundImage = '';
+      thumbnailPreview.classList.remove('has-photo');
+      secretInput.value = '';
+
+      // Go back to secret word screen
+      showScreen(secretScreen);
     }
   });
 
