@@ -728,9 +728,9 @@
     const gridH = cachedWordGrid.length;
     const gridW = cachedWordGrid[0].length;
 
-    // Place word at the center of the image (matches embedded pixels)
-    const imgCenterX = Math.floor(iw / 2);
-    const imgCenterY = Math.floor(ih / 2);
+    // Place word at whatever image pixel is at the center of the viewport
+    const imgCenterX = Math.floor((cw / 2 - drawX) / scale);
+    const imgCenterY = Math.floor((ch / 2 - drawY) / scale);
 
     const startX = imgCenterX - Math.floor(gridW / 2);
     const startY = imgCenterY - Math.floor(gridH / 2);
