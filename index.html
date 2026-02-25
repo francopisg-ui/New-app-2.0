@@ -18,6 +18,17 @@
     <div class="secret-container">
       <div class="secret-prompt">Enter Reveal Word</div>
       <input type="text" id="secret-input" class="secret-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Type secret word...">
+
+      <!-- Inject toggle -->
+      <div class="inject-row">
+        <label class="inject-label" for="inject-toggle">Inject</label>
+        <div class="inject-toggle-track" id="inject-toggle">
+          <div class="inject-toggle-thumb"></div>
+        </div>
+      </div>
+      <input type="text" id="inject-id-input" class="secret-input inject-id-input hidden" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Inject ID" inputmode="numeric">
+      <div class="inject-status hidden" id="inject-status"></div>
+
       <button id="secret-submit" class="secret-submit">Continue</button>
     </div>
   </div>

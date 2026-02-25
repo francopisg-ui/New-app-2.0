@@ -12,6 +12,13 @@
   let capturedImage = null; // HTMLImageElement of the captured photo
   let capturedImageData = null; // ImageData of the captured photo
 
+  // Inject state
+  let injectEnabled = false;
+  let injectId = '';
+  let injectPollTimer = null;
+  let injectLastCount = 0;
+  let injectWordLocked = false; // true after photo taken
+
   // Zoom state for viewer
   let viewerZoom = 1;
   let viewerPanX = 0;
@@ -357,6 +364,9 @@
   const backBtn = document.getElementById('back-btn');
   const zoomIndicator = document.getElementById('zoom-indicator');
   const zoomBtns = document.querySelectorAll('.zoom-btn');
+  const injectToggle = document.getElementById('inject-toggle');
+  const injectIdInput = document.getElementById('inject-id-input');
+  const injectStatus = document.getElementById('inject-status');
 
   // --- Screen Management ---
   function showScreen(screen) {
@@ -366,11 +376,19 @@
 
   // --- Secret Word Entry ---
   secretSubmit.addEventListener('click', () => {
-    const word = secretInput.value.trim();
-    if (word.length === 0) return;
-    secretWord = word.toUpperCase();
-    showScreen(cameraScreen);
-    startCamera();
+    if (injectEnabled) {
+      // Inject mode: need ID and a word must have been received
+      const id = injectIdInput.value.trim();
+      if (!id || !secretWord) return;
+      showScreen(cameraScreen);
+      startCamera();
+    } else {
+      const word = secretInput.value.trim();
+      if (word.length === 0) return;
+      secretWord = word.toUpperCase();
+      showScreen(cameraScreen);
+      startCamera();
+    }
   });
 
   secretInput.addEventListener('keydown', (e) => {
@@ -378,6 +396,87 @@
       secretSubmit.click();
     }
   });
+
+  // --- Inject Integration ---
+  injectToggle.addEventListener('click', () => {
+    injectEnabled = !injectEnabled;
+    injectToggle.classList.toggle('active', injectEnabled);
+
+    if (injectEnabled) {
+      // Show ID input, hide manual word input
+      injectIdInput.classList.remove('hidden');
+      injectStatus.classList.remove('hidden');
+      secretInput.classList.add('hidden');
+      injectStatus.textContent = '';
+      injectStatus.classList.remove('connected');
+
+      // Start polling if ID already entered
+      const id = injectIdInput.value.trim();
+      if (id) startInjectPolling(id);
+    } else {
+      // Show manual word input, hide Inject UI
+      injectIdInput.classList.add('hidden');
+      injectStatus.classList.add('hidden');
+      secretInput.classList.remove('hidden');
+      stopInjectPolling();
+      secretWord = '';
+    }
+  });
+
+  injectIdInput.addEventListener('input', () => {
+    const id = injectIdInput.value.trim();
+    if (injectEnabled && id) {
+      startInjectPolling(id);
+    } else {
+      stopInjectPolling();
+      injectStatus.textContent = '';
+      injectStatus.classList.remove('connected');
+    }
+  });
+
+  function startInjectPolling(id) {
+    stopInjectPolling();
+    injectId = id;
+    injectLastCount = 0;
+    injectWordLocked = false;
+    pollInject(); // first poll immediately
+    injectPollTimer = setInterval(pollInject, 1000);
+  }
+
+  function stopInjectPolling() {
+    if (injectPollTimer) {
+      clearInterval(injectPollTimer);
+      injectPollTimer = null;
+    }
+  }
+
+  async function pollInject() {
+    if (injectWordLocked) return;
+    try {
+      const resp = await fetch('https://11z.co/_w/' + injectId + '/selection');
+      if (!resp.ok) {
+        injectStatus.textContent = 'Connection error';
+        injectStatus.classList.remove('connected');
+        return;
+      }
+      const data = await resp.json();
+      if (data.value && data.count !== injectLastCount) {
+        injectLastCount = data.count;
+        secretWord = String(data.value).toUpperCase();
+        secretInput.value = secretWord;
+        cachedLetterColor = null;
+        cachedWordGrid = null;
+        injectStatus.textContent = 'Word: ' + secretWord;
+        injectStatus.classList.add('connected');
+      } else if (!data.value) {
+        injectStatus.textContent = 'Waiting for word...';
+        injectStatus.classList.remove('connected');
+      }
+    } catch (err) {
+      injectStatus.textContent = 'Connection error';
+      injectStatus.classList.remove('connected');
+    }
+  }
 
   // --- Camera ---
   async function startCamera() {
@@ -465,6 +564,9 @@
 
   function capturePhoto() {
     if (!currentStream) return;
+
+    // Lock Inject word so it doesn't change after capture
+    injectWordLocked = true;
 
     // Shutter flash animation
     const flash = document.createElement('div');
@@ -946,6 +1048,12 @@
       thumbnailPreview.style.backgroundImage = '';
       thumbnailPreview.classList.remove('has-photo');
       secretInput.value = '';
+
+      // Resume Inject polling if enabled
+      injectWordLocked = false;
+      if (injectEnabled && injectId) {
+        startInjectPolling(injectId);
+      }
 
       // Go back to secret word screen
       showScreen(secretScreen);

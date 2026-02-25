@@ -92,6 +92,69 @@ html, body {
   opacity: 0.7;
 }
 
+/* Inject toggle row */
+.inject-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 4px;
+}
+
+.inject-label {
+  font-size: 17px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.inject-toggle-track {
+  width: 51px;
+  height: 31px;
+  border-radius: 16px;
+  background: #39393d;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.25s;
+}
+
+.inject-toggle-track.active {
+  background: #30d158;
+}
+
+.inject-toggle-thumb {
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.25s;
+}
+
+.inject-toggle-track.active .inject-toggle-thumb {
+  transform: translateX(20px);
+}
+
+.inject-id-input {
+  font-size: 16px !important;
+}
+
+.inject-status {
+  font-size: 14px;
+  color: #8e8e93;
+  min-height: 20px;
+  text-align: center;
+}
+
+.inject-status.connected {
+  color: #30d158;
+}
+
+.hidden {
+  display: none !important;
+}
+
 /* ========== CAMERA SCREEN ========== */
 #camera-screen {
   background: #000;
