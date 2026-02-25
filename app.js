@@ -452,9 +452,6 @@
     captureCanvas.height = h;
     captureCtx.drawImage(video, 0, 0, w, h);
 
-    // Embed the secret word into the image pixels
-    embedSecretWord(w, h);
-
     // Create image from canvas
     const dataURL = captureCanvas.toDataURL('image/jpeg', 0.95);
     capturedImage = new Image();
@@ -627,6 +624,11 @@
       zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
     }
 
+    // Overlay secret word at viewport center when zoomed past 50%
+    if (viewerZoom >= viewerMaxZoom * 0.5) {
+      renderSecretOverlay(drawX, drawY, scale, cw, ch);
+    }
+
     // Update zoom indicator
     updateZoomIndicator();
   }
@@ -660,6 +662,81 @@
           scale - gap * 2,
           scale - gap * 2
         );
+      }
+    }
+  }
+
+  function renderSecretOverlay(drawX, drawY, scale, cw, ch) {
+    if (!secretWord || !capturedImageData) return;
+
+    const iw = capturedImageData.width;
+    const ih = capturedImageData.height;
+    const data = capturedImageData.data;
+
+    const wordGrid = buildWordGrid(secretWord);
+    if (!wordGrid || wordGrid.length === 0) return;
+
+    const gridH = wordGrid.length;
+    const gridW = wordGrid[0].length;
+
+    // Convert viewport center to image pixel coordinates
+    const viewCenterX = cw / 2;
+    const viewCenterY = ch / 2;
+    const imgCenterX = Math.floor((viewCenterX - drawX) / scale);
+    const imgCenterY = Math.floor((viewCenterY - drawY) / scale);
+
+    // Position word grid centered on the viewport center
+    const startX = imgCenterX - Math.floor(gridW / 2);
+    const startY = imgCenterY - Math.floor(gridH / 2);
+
+    // Sample colors from the area around the word to pick a contrasting color
+    const sampleRadius = 15;
+    let avgR = 0, avgG = 0, avgB = 0, count = 0;
+    for (let sy = imgCenterY - sampleRadius; sy < imgCenterY + sampleRadius; sy++) {
+      for (let sx = imgCenterX - sampleRadius; sx < imgCenterX + sampleRadius; sx++) {
+        if (sx >= 0 && sx < iw && sy >= 0 && sy < ih) {
+          const idx = (sy * iw + sx) * 4;
+          avgR += data[idx];
+          avgG += data[idx + 1];
+          avgB += data[idx + 2];
+          count++;
+        }
+      }
+    }
+    if (count === 0) return;
+    avgR = Math.floor(avgR / count);
+    avgG = Math.floor(avgG / count);
+    avgB = Math.floor(avgB / count);
+
+    const brightness = (avgR + avgG + avgB) / 3;
+    let letterR, letterG, letterB;
+    if (brightness > 128) {
+      letterR = Math.max(0, avgR - 60);
+      letterG = Math.max(0, avgG - 55);
+      letterB = Math.max(0, avgB - 50);
+    } else {
+      letterR = Math.min(255, avgR + 60);
+      letterG = Math.min(255, avgG + 55);
+      letterB = Math.min(255, avgB + 50);
+    }
+
+    const gap = scale > 20 ? 1 : 0;
+
+    for (let gy = 0; gy < gridH; gy++) {
+      for (let gx = 0; gx < gridW; gx++) {
+        if (wordGrid[gy][gx] === 1) {
+          const px = startX + gx;
+          const py = startY + gy;
+          if (px >= 0 && px < iw && py >= 0 && py < ih) {
+            zoomCtx.fillStyle = `rgb(${letterR},${letterG},${letterB})`;
+            zoomCtx.fillRect(
+              drawX + px * scale + gap,
+              drawY + py * scale + gap,
+              scale - gap * 2,
+              scale - gap * 2
+            );
+          }
+        }
       }
     }
   }
