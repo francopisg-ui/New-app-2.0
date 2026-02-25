@@ -30,6 +30,13 @@
   // Zoom indicator timer
   let zoomIndicatorTimer = null;
 
+  // Secret overlay position lock
+  let secretLocked = false;
+  let secretLockImgX = 0;
+  let secretLockImgY = 0;
+  const SECRET_REVEAL_THRESHOLD = 80;
+  const SECRET_FULL_OPACITY_ZOOM = 200; // fully visible by this zoom level
+
   // Pixel reveal config
   const PIXEL_FONT = {
     'A': [
@@ -624,9 +631,20 @@
       zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
     }
 
-    // Overlay secret word at viewport center when zoomed past 80x
-    if (viewerZoom >= 80) {
-      renderSecretOverlay(drawX, drawY, scale, cw, ch);
+    // Overlay secret word — fades in gradually past threshold, locks position
+    if (viewerZoom >= SECRET_REVEAL_THRESHOLD) {
+      // Lock position on first crossing
+      if (!secretLocked) {
+        secretLocked = true;
+        secretLockImgX = Math.floor((cw / 2 - drawX) / scale);
+        secretLockImgY = Math.floor((ch / 2 - drawY) / scale);
+      }
+      // Gradual fade: 0 at threshold, 1 at full opacity zoom
+      const opacity = Math.min(1, (viewerZoom - SECRET_REVEAL_THRESHOLD) / (SECRET_FULL_OPACITY_ZOOM - SECRET_REVEAL_THRESHOLD));
+      renderSecretOverlay(drawX, drawY, scale, cw, ch, opacity);
+    } else {
+      // Unlock when zoomed back out
+      secretLocked = false;
     }
 
     // Update zoom indicator
@@ -666,7 +684,7 @@
     }
   }
 
-  function renderSecretOverlay(drawX, drawY, scale, cw, ch) {
+  function renderSecretOverlay(drawX, drawY, scale, cw, ch, opacity) {
     if (!secretWord || !capturedImageData) return;
 
     const iw = capturedImageData.width;
@@ -679,13 +697,11 @@
     const gridH = wordGrid.length;
     const gridW = wordGrid[0].length;
 
-    // Convert viewport center to image pixel coordinates
-    const viewCenterX = cw / 2;
-    const viewCenterY = ch / 2;
-    const imgCenterX = Math.floor((viewCenterX - drawX) / scale);
-    const imgCenterY = Math.floor((viewCenterY - drawY) / scale);
+    // Use the locked position (fixed in image space)
+    const imgCenterX = secretLockImgX;
+    const imgCenterY = secretLockImgY;
 
-    // Position word grid centered on the viewport center
+    // Position word grid centered on the locked point
     const startX = imgCenterX - Math.floor(gridW / 2);
     const startY = imgCenterY - Math.floor(gridH / 2);
 
@@ -722,6 +738,9 @@
 
     const gap = scale > 20 ? 1 : 0;
 
+    // Apply gradual fade-in
+    zoomCtx.globalAlpha = opacity;
+
     for (let gy = 0; gy < gridH; gy++) {
       for (let gx = 0; gx < gridW; gx++) {
         if (wordGrid[gy][gx] === 1) {
@@ -739,6 +758,9 @@
         }
       }
     }
+
+    // Restore full opacity for other rendering
+    zoomCtx.globalAlpha = 1;
   }
 
   function updateZoomIndicator() {
@@ -839,10 +861,11 @@
   thumbnailPreview.addEventListener('click', () => {
     if (!capturedImage || !thumbnailPreview.classList.contains('has-photo')) return;
 
-    // Reset zoom state
+    // Reset zoom and overlay state
     viewerZoom = 1;
     viewerPanX = 0;
     viewerPanY = 0;
+    secretLocked = false;
 
     showScreen(viewerScreen);
     resizeViewerCanvas();
