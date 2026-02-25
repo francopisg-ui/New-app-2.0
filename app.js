@@ -34,8 +34,8 @@
   let secretLocked = false;
   let secretLockImgX = 0;
   let secretLockImgY = 0;
-  const SECRET_REVEAL_THRESHOLD = 15;
-  const SECRET_FULL_OPACITY_ZOOM = 300; // very slow fade from 15x to 300x
+  const SECRET_REVEAL_THRESHOLD = 8;
+  const SECRET_FULL_OPACITY_ZOOM = 300; // very slow fade from 8x to 300x
 
   // Pixel reveal config
   const PIXEL_FONT = {
@@ -727,13 +727,13 @@
     const brightness = (avgR + avgG + avgB) / 3;
     let letterR, letterG, letterB;
     if (brightness > 128) {
-      letterR = Math.max(0, avgR - 60);
-      letterG = Math.max(0, avgG - 55);
-      letterB = Math.max(0, avgB - 50);
+      letterR = Math.max(0, avgR - 80);
+      letterG = Math.max(0, avgG - 75);
+      letterB = Math.max(0, avgB - 70);
     } else {
-      letterR = Math.min(255, avgR + 60);
-      letterG = Math.min(255, avgG + 55);
-      letterB = Math.min(255, avgB + 50);
+      letterR = Math.min(255, avgR + 80);
+      letterG = Math.min(255, avgG + 75);
+      letterB = Math.min(255, avgB + 70);
     }
 
     const gap = scale > 20 ? 1 : 0;
