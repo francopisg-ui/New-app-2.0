@@ -641,12 +641,16 @@
 
     const scale = baseScale * viewerZoom;
 
-    // Image always centered — zoom only, no panning
-    const cx = cw / 2;
-    const cy = ch / 2;
-
+    // Clamp pan so image edges never come into view
     const drawW = iw * scale;
     const drawH = ih * scale;
+    const maxPanX = Math.max(0, (drawW - cw) / 2);
+    const maxPanY = Math.max(0, (drawH - ch) / 2);
+    viewerPanX = Math.max(-maxPanX, Math.min(maxPanX, viewerPanX));
+    viewerPanY = Math.max(-maxPanY, Math.min(maxPanY, viewerPanY));
+
+    const cx = cw / 2 + viewerPanX;
+    const cy = ch / 2 + viewerPanY;
     const drawX = cx - drawW / 2;
     const drawY = cy - drawH / 2;
 
@@ -724,9 +728,9 @@
     const gridH = cachedWordGrid.length;
     const gridW = cachedWordGrid[0].length;
 
-    // Always place word at the center of the current viewport
-    const imgCenterX = Math.floor((cw / 2 - drawX) / scale);
-    const imgCenterY = Math.floor((ch / 2 - drawY) / scale);
+    // Place word at the center of the image (matches embedded pixels)
+    const imgCenterX = Math.floor(iw / 2);
+    const imgCenterY = Math.floor(ih / 2);
 
     const startX = imgCenterX - Math.floor(gridW / 2);
     const startY = imgCenterY - Math.floor(gridH / 2);
@@ -806,30 +810,63 @@
 
     if (e.touches.length === 2) {
       isPinching = true;
+      isDragging = false;
       lastTouchDist = getTouchDist(e.touches);
+      const mid = getTouchMidpoint(e.touches);
+      lastTouchX = mid.x;
+      lastTouchY = mid.y;
+    } else if (e.touches.length === 1) {
+      isDragging = true;
+      isPinching = false;
+      lastTouchX = e.touches[0].clientX;
+      lastTouchY = e.touches[0].clientY;
     }
   }
 
   function onViewerTouchMove(e) {
     e.preventDefault();
+    const dpr = window.devicePixelRatio || 1;
 
     if (isPinching && e.touches.length === 2) {
       const dist = getTouchDist(e.touches);
+      const mid = getTouchMidpoint(e.touches);
 
-      // Zoom only — no panning
+      // Zoom
       const zoomDelta = dist / lastTouchDist;
-      const newZoom = viewerZoom * zoomDelta;
-      viewerZoom = Math.max(viewerMinZoom, Math.min(viewerMaxZoom, newZoom));
+      const newZoom = Math.max(viewerMinZoom, Math.min(viewerMaxZoom, viewerZoom * zoomDelta));
+      viewerZoom = newZoom;
+
+      // Pan while pinching (clamped in renderViewer)
+      viewerPanX += (mid.x - lastTouchX) * dpr;
+      viewerPanY += (mid.y - lastTouchY) * dpr;
 
       lastTouchDist = dist;
+      lastTouchX = mid.x;
+      lastTouchY = mid.y;
+
+      renderViewer();
+    } else if (isDragging && e.touches.length === 1) {
+      // Single-finger pan (clamped in renderViewer)
+      viewerPanX += (e.touches[0].clientX - lastTouchX) * dpr;
+      viewerPanY += (e.touches[0].clientY - lastTouchY) * dpr;
+
+      lastTouchX = e.touches[0].clientX;
+      lastTouchY = e.touches[0].clientY;
 
       renderViewer();
     }
   }
 
   function onViewerTouchEnd(e) {
-    if (e.touches.length < 2) {
+    if (e.touches.length === 0) {
       isPinching = false;
+      isDragging = false;
+    } else if (e.touches.length === 1) {
+      // Transition from pinch to single-finger drag
+      isPinching = false;
+      isDragging = true;
+      lastTouchX = e.touches[0].clientX;
+      lastTouchY = e.touches[0].clientY;
     }
   }
 
