@@ -30,12 +30,9 @@
   // Zoom indicator timer
   let zoomIndicatorTimer = null;
 
-  // Secret overlay position lock
-  let secretLocked = false;
-  let secretLockImgX = 0;
-  let secretLockImgY = 0;
+  // Secret reveal config
   const SECRET_REVEAL_THRESHOLD = 8;
-  const SECRET_FULL_OPACITY_ZOOM = 300; // very slow fade from 8x to 300x
+  const SECRET_FULL_OPACITY_ZOOM = 300;
 
   // Pixel reveal config
   const PIXEL_FONT = {
@@ -469,6 +466,9 @@
       // Update thumbnail in bottom-left — stay on camera
       thumbnailPreview.style.backgroundImage = `url(${dataURL})`;
       thumbnailPreview.classList.add('has-photo');
+      // Clear overlay caches for new photo
+      cachedLetterColor = null;
+      cachedWordGrid = null;
     };
     capturedImage.src = dataURL;
   }
@@ -586,10 +586,10 @@
 
   // --- Viewer / Zoom ---
   function resizeViewerCanvas() {
-    zoomCanvas.width = window.innerWidth * window.devicePixelRatio;
-    zoomCanvas.height = window.innerHeight * window.devicePixelRatio;
-    zoomCanvas.style.width = window.innerWidth + 'px';
-    zoomCanvas.style.height = window.innerHeight + 'px';
+    // Use actual rendered size — avoids iOS dynamic toolbar mismatch
+    const rect = zoomCanvas.getBoundingClientRect();
+    zoomCanvas.width = rect.width * window.devicePixelRatio;
+    zoomCanvas.height = rect.height * window.devicePixelRatio;
   }
 
   function renderViewer() {
@@ -631,20 +631,10 @@
       zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
     }
 
-    // Overlay secret word — fades in gradually past threshold, locks position
+    // Overlay secret word — fades in gradually, always at viewport center
     if (viewerZoom >= SECRET_REVEAL_THRESHOLD) {
-      // Lock position on first crossing
-      if (!secretLocked) {
-        secretLocked = true;
-        secretLockImgX = Math.floor((cw / 2 - drawX) / scale);
-        secretLockImgY = Math.floor((ch / 2 - drawY) / scale);
-      }
-      // Gradual fade: 0 at threshold, 1 at full opacity zoom
       const opacity = Math.min(1, (viewerZoom - SECRET_REVEAL_THRESHOLD) / (SECRET_FULL_OPACITY_ZOOM - SECRET_REVEAL_THRESHOLD));
       renderSecretOverlay(drawX, drawY, scale, cw, ch, opacity);
-    } else {
-      // Unlock when zoomed back out
-      secretLocked = false;
     }
 
     // Update zoom indicator
@@ -684,70 +674,73 @@
     }
   }
 
+  // Cache for secret overlay color (avoid per-frame sampling)
+  let cachedLetterColor = null;
+  let cachedWordGrid = null;
+
   function renderSecretOverlay(drawX, drawY, scale, cw, ch, opacity) {
     if (!secretWord || !capturedImageData) return;
 
     const iw = capturedImageData.width;
     const ih = capturedImageData.height;
-    const data = capturedImageData.data;
 
-    const wordGrid = buildWordGrid(secretWord);
-    if (!wordGrid || wordGrid.length === 0) return;
+    // Build word grid once and cache
+    if (!cachedWordGrid) {
+      cachedWordGrid = buildWordGrid(secretWord);
+    }
+    if (!cachedWordGrid || cachedWordGrid.length === 0) return;
 
-    const gridH = wordGrid.length;
-    const gridW = wordGrid[0].length;
+    const gridH = cachedWordGrid.length;
+    const gridW = cachedWordGrid[0].length;
 
-    // Use the locked position (fixed in image space)
-    const imgCenterX = secretLockImgX;
-    const imgCenterY = secretLockImgY;
+    // Always place word at the center of the current viewport
+    const imgCenterX = Math.floor((cw / 2 - drawX) / scale);
+    const imgCenterY = Math.floor((ch / 2 - drawY) / scale);
 
-    // Position word grid centered on the locked point
     const startX = imgCenterX - Math.floor(gridW / 2);
     const startY = imgCenterY - Math.floor(gridH / 2);
 
-    // Sample colors from the area around the word to pick a contrasting color
-    const sampleRadius = 15;
-    let avgR = 0, avgG = 0, avgB = 0, count = 0;
-    for (let sy = imgCenterY - sampleRadius; sy < imgCenterY + sampleRadius; sy++) {
-      for (let sx = imgCenterX - sampleRadius; sx < imgCenterX + sampleRadius; sx++) {
-        if (sx >= 0 && sx < iw && sy >= 0 && sy < ih) {
-          const idx = (sy * iw + sx) * 4;
-          avgR += data[idx];
-          avgG += data[idx + 1];
-          avgB += data[idx + 2];
-          count++;
+    // Compute letter color once and cache it
+    if (!cachedLetterColor) {
+      const data = capturedImageData.data;
+      const cx = Math.floor(iw / 2);
+      const cy = Math.floor(ih / 2);
+      const sampleRadius = 30;
+      let avgR = 0, avgG = 0, avgB = 0, count = 0;
+      for (let sy = cy - sampleRadius; sy < cy + sampleRadius; sy++) {
+        for (let sx = cx - sampleRadius; sx < cx + sampleRadius; sx++) {
+          if (sx >= 0 && sx < iw && sy >= 0 && sy < ih) {
+            const idx = (sy * iw + sx) * 4;
+            avgR += data[idx];
+            avgG += data[idx + 1];
+            avgB += data[idx + 2];
+            count++;
+          }
         }
       }
-    }
-    if (count === 0) return;
-    avgR = Math.floor(avgR / count);
-    avgG = Math.floor(avgG / count);
-    avgB = Math.floor(avgB / count);
-
-    const brightness = (avgR + avgG + avgB) / 3;
-    let letterR, letterG, letterB;
-    if (brightness > 128) {
-      letterR = Math.max(0, avgR - 105);
-      letterG = Math.max(0, avgG - 100);
-      letterB = Math.max(0, avgB - 95);
-    } else {
-      letterR = Math.min(255, avgR + 105);
-      letterG = Math.min(255, avgG + 100);
-      letterB = Math.min(255, avgB + 95);
+      if (count === 0) return;
+      avgR = Math.floor(avgR / count);
+      avgG = Math.floor(avgG / count);
+      avgB = Math.floor(avgB / count);
+      const brightness = (avgR + avgG + avgB) / 3;
+      if (brightness > 128) {
+        cachedLetterColor = `rgb(${Math.max(0, avgR - 105)},${Math.max(0, avgG - 100)},${Math.max(0, avgB - 95)})`;
+      } else {
+        cachedLetterColor = `rgb(${Math.min(255, avgR + 105)},${Math.min(255, avgG + 100)},${Math.min(255, avgB + 95)})`;
+      }
     }
 
     const gap = scale > 20 ? 1 : 0;
 
-    // Apply gradual fade-in
     zoomCtx.globalAlpha = opacity;
+    zoomCtx.fillStyle = cachedLetterColor;
 
     for (let gy = 0; gy < gridH; gy++) {
       for (let gx = 0; gx < gridW; gx++) {
-        if (wordGrid[gy][gx] === 1) {
+        if (cachedWordGrid[gy][gx] === 1) {
           const px = startX + gx;
           const py = startY + gy;
           if (px >= 0 && px < iw && py >= 0 && py < ih) {
-            zoomCtx.fillStyle = `rgb(${letterR},${letterG},${letterB})`;
             zoomCtx.fillRect(
               drawX + px * scale + gap,
               drawY + py * scale + gap,
@@ -759,7 +752,6 @@
       }
     }
 
-    // Restore full opacity for other rendering
     zoomCtx.globalAlpha = 1;
   }
 
@@ -861,11 +853,10 @@
   thumbnailPreview.addEventListener('click', () => {
     if (!capturedImage || !thumbnailPreview.classList.contains('has-photo')) return;
 
-    // Reset zoom and overlay state
+    // Reset zoom state
     viewerZoom = 1;
     viewerPanX = 0;
     viewerPanY = 0;
-    secretLocked = false;
 
     showScreen(viewerScreen);
     resizeViewerCanvas();
@@ -913,6 +904,8 @@
       secretWord = '';
       capturedImage = null;
       capturedImageData = null;
+      cachedLetterColor = null;
+      cachedWordGrid = null;
       viewerZoom = 1;
       viewerPanX = 0;
       viewerPanY = 0;
