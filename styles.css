@@ -1,0 +1,406 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  color: #fff;
+  touch-action: none;
+}
+
+.screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  flex-direction: column;
+}
+
+.screen.active {
+  display: flex;
+}
+
+/* ========== SECRET WORD SCREEN ========== */
+#secret-screen {
+  background: #000;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+.secret-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 40px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.secret-prompt {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #fff;
+}
+
+.secret-input {
+  width: 100%;
+  padding: 14px 18px;
+  font-size: 18px;
+  background: #1c1c1e;
+  border: 1px solid #333;
+  border-radius: 12px;
+  color: #fff;
+  text-align: center;
+  outline: none;
+  font-family: inherit;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.secret-input:focus {
+  border-color: #0a84ff;
+}
+
+.secret-submit {
+  width: 100%;
+  padding: 14px;
+  font-size: 17px;
+  font-weight: 600;
+  background: #0a84ff;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.secret-submit:active {
+  opacity: 0.7;
+}
+
+/* ========== CAMERA SCREEN ========== */
+#camera-screen {
+  background: #000;
+  position: relative;
+}
+
+#camera-preview {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Top bar */
+.camera-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: env(safe-area-inset-top, 44px) 16px 8px 16px;
+  padding-top: calc(env(safe-area-inset-top, 44px) + 8px);
+  z-index: 10;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 100%);
+}
+
+.top-bar-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 20px;
+}
+
+.top-icon-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.9;
+}
+
+.top-icon-btn:active {
+  opacity: 0.5;
+}
+
+.live-text {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-decoration: line-through;
+  color: #fff;
+  opacity: 0.9;
+}
+
+.top-spacer {
+  flex: 1;
+}
+
+.exposure-btn {
+  opacity: 0.9;
+}
+
+/* Format badge */
+.format-badge {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 44px) + 50px);
+  right: 16px;
+  background: rgba(255, 204, 0, 0.2);
+  color: #fc0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  z-index: 10;
+  letter-spacing: 0.5px;
+}
+
+.format-max {
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+/* Zoom controls */
+.zoom-controls {
+  position: absolute;
+  bottom: 220px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 50px;
+  padding: 3px;
+  z-index: 10;
+}
+
+.zoom-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  opacity: 0.6;
+  transition: all 0.2s;
+}
+
+.zoom-btn.active {
+  background: rgba(255, 204, 0, 0.25);
+  color: #fc0;
+  opacity: 1;
+  font-weight: 600;
+}
+
+.zoom-btn:active {
+  opacity: 0.3;
+}
+
+/* Bottom bar */
+.camera-bottom-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #000;
+  padding-bottom: env(safe-area-inset-bottom, 20px);
+  z-index: 10;
+}
+
+/* Mode selector */
+.mode-selector {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  padding: 14px 0 16px 0;
+}
+
+.mode-item {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.8px;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+}
+
+.mode-item.active-mode {
+  color: #fc0;
+  font-weight: 600;
+}
+
+/* Capture row */
+.capture-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px 16px 40px;
+}
+
+/* Thumbnail */
+.thumbnail-preview {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: #1c1c1e;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+}
+
+/* Shutter button */
+.shutter-btn {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  background: transparent;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shutter-btn:active .shutter-inner {
+  opacity: 0.6;
+  transform: scale(0.9);
+}
+
+.shutter-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #fff;
+  transition: all 0.1s;
+}
+
+/* Flip camera button */
+.flip-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flip-btn:active {
+  opacity: 0.5;
+}
+
+/* ========== VIEWER SCREEN ========== */
+#viewer-screen {
+  background: #000;
+  position: relative;
+  overflow: hidden;
+}
+
+#zoom-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.viewer-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: calc(env(safe-area-inset-top, 44px) + 8px) 16px 8px 16px;
+  z-index: 10;
+}
+
+.viewer-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.viewer-btn:active {
+  opacity: 0.5;
+}
+
+.zoom-indicator {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 44px) + 16px);
+  right: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 4px 10px;
+  border-radius: 8px;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.zoom-indicator.visible {
+  opacity: 1;
+}
+
+.viewer-hint {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 20px) + 30px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  z-index: 10;
+  transition: opacity 1s;
+}
+
+/* Shutter animation */
+.shutter-flash {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  z-index: 999;
+  animation: shutterFlash 0.2s ease-out;
+  pointer-events: none;
+}
+
+@keyframes shutterFlash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Camera">
+  <meta name="theme-color" content="#000000">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <title>Camera</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- SCREEN 1: Secret Word Entry -->
+  <div id="secret-screen" class="screen active">
+    <div class="secret-container">
+      <div class="secret-prompt">Enter Reveal Word</div>
+      <input type="text" id="secret-input" class="secret-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Type secret word...">
+      <button id="secret-submit" class="secret-submit">Continue</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: Camera -->
+  <div id="camera-screen" class="screen">
+    <!-- Camera viewfinder -->
+    <video id="camera-preview" autoplay playsinline muted></video>
+
+    <!-- Top bar -->
+    <div class="camera-top-bar">
+      <div class="top-bar-row">
+        <button id="flash-btn" class="top-icon-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+        </button>
+        <button class="top-icon-btn night-mode-btn" id="night-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+          </svg>
+        </button>
+        <button class="top-icon-btn" id="live-btn">
+          <span class="live-text">LIVE</span>
+        </button>
+        <div class="top-spacer"></div>
+        <button class="top-icon-btn exposure-btn" id="exposure-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Format badge -->
+    <div class="format-badge" id="format-badge">HEIF <span class="format-max">24</span></div>
+
+    <!-- Zoom controls -->
+    <div class="zoom-controls">
+      <button class="zoom-btn" data-zoom="0.5">.5</button>
+      <button class="zoom-btn active" data-zoom="1">1x</button>
+      <button class="zoom-btn" data-zoom="2">2</button>
+      <button class="zoom-btn" data-zoom="4">4</button>
+      <button class="zoom-btn" data-zoom="8">8</button>
+    </div>
+
+    <!-- Bottom bar -->
+    <div class="camera-bottom-bar">
+      <!-- Mode selector -->
+      <div class="mode-selector">
+        <span class="mode-item">VIDEO</span>
+        <span class="mode-item active-mode">PHOTO</span>
+        <span class="mode-item">PORTRAIT</span>
+        <span class="mode-item">PANO</span>
+      </div>
+
+      <!-- Capture row -->
+      <div class="capture-row">
+        <div class="thumbnail-preview" id="thumbnail-preview"></div>
+        <button class="shutter-btn" id="shutter-btn">
+          <div class="shutter-inner"></div>
+        </button>
+        <button class="flip-btn" id="flip-btn">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M20 7l-4-4-4 4"/>
+            <path d="M16 3v10"/>
+            <path d="M4 17l4 4 4-4"/>
+            <path d="M8 21V11"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: Photo Viewer / Zoom -->
+  <div id="viewer-screen" class="screen">
+    <canvas id="zoom-canvas"></canvas>
+    <div class="viewer-top-bar">
+      <button id="back-btn" class="viewer-btn">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </button>
+    </div>
+    <div class="zoom-indicator" id="zoom-indicator">1.0x</div>
+    <div class="viewer-hint" id="viewer-hint">Pinch to zoom</div>
+  </div>
+
+  <!-- Hidden canvas for photo capture -->
+  <canvas id="capture-canvas" style="display:none;"></canvas>
+
+  <script src="app.js"></script>
+</body>
+</html>
