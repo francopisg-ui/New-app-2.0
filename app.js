@@ -835,7 +835,7 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    const SHIFT = 80; // clearly legible contrast
+    const SHIFT = 120; // clearly legible contrast
     const gap = scale > 20 ? 1 : 0;
 
     zoomCtx.globalAlpha = opacity;
