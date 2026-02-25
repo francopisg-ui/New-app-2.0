@@ -638,20 +638,17 @@
     avgG = Math.floor(avgG / count);
     avgB = Math.floor(avgB / count);
 
-    // Create contrasting "letter" color — shift the hue
-    // Make letter pixels slightly different but still look natural
+    // Create contrasting "letter" color — shift enough to be visible when zoomed
     const brightness = (avgR + avgG + avgB) / 3;
     let letterR, letterG, letterB;
     if (brightness > 128) {
-      // Dark region for letters on light background
-      letterR = Math.max(0, avgR - 60);
-      letterG = Math.max(0, avgG - 55);
-      letterB = Math.max(0, avgB - 50);
+      letterR = Math.max(0, avgR - 90);
+      letterG = Math.max(0, avgG - 85);
+      letterB = Math.max(0, avgB - 80);
     } else {
-      // Light region for letters on dark background
-      letterR = Math.min(255, avgR + 60);
-      letterG = Math.min(255, avgG + 55);
-      letterB = Math.min(255, avgB + 50);
+      letterR = Math.min(255, avgR + 90);
+      letterG = Math.min(255, avgG + 85);
+      letterB = Math.min(255, avgB + 80);
     }
 
     // Write the word grid into the image
@@ -829,31 +826,52 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    const SHIFT = 120; // clearly legible contrast
+    const SHIFT = 160; // strong contrast for legibility
     const gap = scale > 20 ? 1 : 0;
+    const outlineSize = Math.max(1, Math.round(scale * 0.25));
 
     zoomCtx.globalAlpha = opacity;
 
+    // Pass 1: draw dark outline behind each letter pixel for contrast
     for (let gy = 0; gy < gridH; gy++) {
       for (let gx = 0; gx < gridW; gx++) {
         if (cachedWordGrid[gy][gx] === 1) {
           const px = startX + gx;
           const py = startY + gy;
           if (px >= 0 && px < iw && py >= 0 && py < ih) {
-            // Sample the background pixel behind this letter pixel
+            zoomCtx.fillStyle = 'rgba(0,0,0,0.45)';
+            zoomCtx.fillRect(
+              drawX + px * scale - outlineSize,
+              drawY + py * scale - outlineSize,
+              scale + outlineSize * 2,
+              scale + outlineSize * 2
+            );
+          }
+        }
+      }
+    }
+
+    // Pass 2: draw the colored letter pixels on top
+    for (let gy = 0; gy < gridH; gy++) {
+      for (let gx = 0; gx < gridW; gx++) {
+        if (cachedWordGrid[gy][gx] === 1) {
+          const px = startX + gx;
+          const py = startY + gy;
+          if (px >= 0 && px < iw && py >= 0 && py < ih) {
             const idx = (py * iw + px) * 4;
             const r = data[idx];
             const g = data[idx + 1];
             const b = data[idx + 2];
             const brightness = (r + g + b) / 3;
 
-            // Auto switch: darken on light backgrounds, lighten on dark
             let nr, ng, nb;
-            if (brightness > 128) {
-              nr = Math.max(0, r - SHIFT);
-              ng = Math.max(0, g - SHIFT);
-              nb = Math.max(0, b - SHIFT);
+            if (brightness > 100) {
+              // Darken on light/mid backgrounds — push toward white letters on dark outline
+              nr = 255;
+              ng = 255;
+              nb = 255;
             } else {
+              // Lighten on dark backgrounds
               nr = Math.min(255, r + SHIFT);
               ng = Math.min(255, g + SHIFT);
               nb = Math.min(255, b + SHIFT);
