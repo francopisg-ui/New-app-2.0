@@ -464,7 +464,7 @@
         injectLastCount = data.count;
         secretWord = String(data.value).toUpperCase();
         secretInput.value = secretWord;
-        cachedLetterColor = null;
+
         cachedWordGrid = null;
         injectStatus.textContent = 'Word: ' + secretWord;
         injectStatus.classList.add('connected');
@@ -600,7 +600,6 @@
       thumbnailPreview.style.backgroundImage = `url(${dataURL})`;
       thumbnailPreview.classList.add('has-photo');
       // Clear overlay caches for new photo
-      cachedLetterColor = null;
       cachedWordGrid = null;
     };
     capturedImage.src = dataURL;
@@ -811,8 +810,6 @@
     }
   }
 
-  // Cache for secret overlay color (avoid per-frame sampling)
-  let cachedLetterColor = null;
   let cachedWordGrid = null;
 
   function renderSecretOverlay(drawX, drawY, scale, cw, ch, opacity) {
@@ -837,40 +834,11 @@
     const startX = imgCenterX - Math.floor(gridW / 2);
     const startY = imgCenterY - Math.floor(gridH / 2);
 
-    // Compute letter color once and cache it
-    if (!cachedLetterColor) {
-      const data = capturedImageData.data;
-      const cx = Math.floor(iw / 2);
-      const cy = Math.floor(ih / 2);
-      const sampleRadius = 30;
-      let avgR = 0, avgG = 0, avgB = 0, count = 0;
-      for (let sy = cy - sampleRadius; sy < cy + sampleRadius; sy++) {
-        for (let sx = cx - sampleRadius; sx < cx + sampleRadius; sx++) {
-          if (sx >= 0 && sx < iw && sy >= 0 && sy < ih) {
-            const idx = (sy * iw + sx) * 4;
-            avgR += data[idx];
-            avgG += data[idx + 1];
-            avgB += data[idx + 2];
-            count++;
-          }
-        }
-      }
-      if (count === 0) return;
-      avgR = Math.floor(avgR / count);
-      avgG = Math.floor(avgG / count);
-      avgB = Math.floor(avgB / count);
-      const brightness = (avgR + avgG + avgB) / 3;
-      if (brightness > 128) {
-        cachedLetterColor = `rgb(${Math.max(0, avgR - 105)},${Math.max(0, avgG - 100)},${Math.max(0, avgB - 95)})`;
-      } else {
-        cachedLetterColor = `rgb(${Math.min(255, avgR + 105)},${Math.min(255, avgG + 100)},${Math.min(255, avgB + 95)})`;
-      }
-    }
-
+    const data = capturedImageData.data;
+    const SHIFT = 35; // subtle watermark-like contrast
     const gap = scale > 20 ? 1 : 0;
 
     zoomCtx.globalAlpha = opacity;
-    zoomCtx.fillStyle = cachedLetterColor;
 
     for (let gy = 0; gy < gridH; gy++) {
       for (let gx = 0; gx < gridW; gx++) {
@@ -878,6 +846,26 @@
           const px = startX + gx;
           const py = startY + gy;
           if (px >= 0 && px < iw && py >= 0 && py < ih) {
+            // Sample the background pixel behind this letter pixel
+            const idx = (py * iw + px) * 4;
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            const brightness = (r + g + b) / 3;
+
+            // Auto switch: darken on light backgrounds, lighten on dark
+            let nr, ng, nb;
+            if (brightness > 128) {
+              nr = Math.max(0, r - SHIFT);
+              ng = Math.max(0, g - SHIFT);
+              nb = Math.max(0, b - SHIFT);
+            } else {
+              nr = Math.min(255, r + SHIFT);
+              ng = Math.min(255, g + SHIFT);
+              nb = Math.min(255, b + SHIFT);
+            }
+
+            zoomCtx.fillStyle = `rgb(${nr},${ng},${nb})`;
             zoomCtx.fillRect(
               drawX + px * scale + gap,
               drawY + py * scale + gap,
@@ -1040,7 +1028,6 @@
       secretWord = '';
       capturedImage = null;
       capturedImageData = null;
-      cachedLetterColor = null;
       cachedWordGrid = null;
       viewerZoom = 1;
       viewerPanX = 0;
