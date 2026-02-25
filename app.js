@@ -395,16 +395,40 @@
       };
       currentStream = await navigator.mediaDevices.getUserMedia(constraints);
       cameraPreview.srcObject = currentStream;
+
+      // Mirror front camera preview
+      if (facingMode === 'user') {
+        cameraPreview.classList.add('mirrored');
+      } else {
+        cameraPreview.classList.remove('mirrored');
+      }
     } catch (err) {
       console.error('Camera error:', err);
       alert('Camera access is required for this app. Please allow camera access and reload.');
     }
   }
 
-  // Flip camera
-  flipBtn.addEventListener('click', () => {
+  // Flip camera with smooth transition
+  flipBtn.addEventListener('click', async () => {
+    flipBtn.disabled = true;
+    cameraPreview.style.opacity = '0';
+    await new Promise(r => setTimeout(r, 200));
+
     facingMode = facingMode === 'environment' ? 'user' : 'environment';
-    startCamera();
+    await startCamera();
+
+    // Wait for new stream to produce a frame before fading in
+    await new Promise(resolve => {
+      cameraPreview.onplaying = () => {
+        cameraPreview.onplaying = null;
+        resolve();
+      };
+      // Fallback in case onplaying doesn't fire
+      setTimeout(resolve, 500);
+    });
+
+    cameraPreview.style.opacity = '1';
+    flipBtn.disabled = false;
   });
 
   // Flash (visual toggle only for the look)
@@ -454,7 +478,14 @@
     const h = video.videoHeight;
     captureCanvas.width = w;
     captureCanvas.height = h;
+
+    // Mirror capture for front camera so saved image matches the preview
+    if (facingMode === 'user') {
+      captureCtx.translate(w, 0);
+      captureCtx.scale(-1, 1);
+    }
     captureCtx.drawImage(video, 0, 0, w, h);
+    captureCtx.setTransform(1, 0, 0, 1, 0, 0); // reset transform
 
     // Create image from canvas
     const dataURL = captureCanvas.toDataURL('image/jpeg', 0.95);
