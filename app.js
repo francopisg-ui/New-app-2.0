@@ -1172,7 +1172,6 @@
     showScreen(viewerScreen);
     resizeViewerCanvas();
     renderViewer();
-    startAutoZoom();
   });
 
   // --- Back Button ---
@@ -1389,61 +1388,77 @@
       }
     }
 
-    // Word layer: trippy effects
+    // Settle phase: once all columns fall, fade effects over 1s to clean word on black
+    if (allFallen && !meltData.settleStart) {
+      meltData.settleStart = timestamp;
+    }
+
+    let fx = 1; // effect intensity: 1 = full trippy, 0 = clean
+    if (meltData.settleStart) {
+      fx = Math.max(0, 1 - (timestamp - meltData.settleStart) / 1000);
+    }
+
+    // Word layer
     const hue = (elapsed * 0.06) % 360;
     const pulse = 0.85 + Math.sin(elapsed * 0.003) * 0.15;
-    const breathe = 1 + Math.sin(elapsed * 0.002) * 0.015;
+    const breathe = 1 + Math.sin(elapsed * 0.002) * (0.015 * fx);
     const supportsFilter = typeof zoomCtx.filter === 'string';
 
-    // Outer glow layer 1
-    zoomCtx.save();
-    zoomCtx.globalAlpha = 0.15 + Math.sin(elapsed * 0.002) * 0.1;
-    if (supportsFilter) zoomCtx.filter = 'blur(30px) hue-rotate(' + hue + 'deg)';
-    zoomCtx.drawImage(wordCanvas, 0, 0);
-    zoomCtx.restore();
+    // Glow layers (fade out during settle)
+    if (fx > 0.01) {
+      zoomCtx.save();
+      zoomCtx.globalAlpha = (0.15 + Math.sin(elapsed * 0.002) * 0.1) * fx;
+      if (supportsFilter) zoomCtx.filter = 'blur(30px) hue-rotate(' + hue + 'deg)';
+      zoomCtx.drawImage(wordCanvas, 0, 0);
+      zoomCtx.restore();
 
-    // Outer glow layer 2
-    zoomCtx.save();
-    zoomCtx.globalAlpha = 0.2 + Math.sin(elapsed * 0.004 + 1) * 0.15;
-    if (supportsFilter) zoomCtx.filter = 'blur(12px) hue-rotate(' + (hue + 120) + 'deg) brightness(150%)';
-    zoomCtx.drawImage(wordCanvas, 0, 0);
-    zoomCtx.restore();
+      zoomCtx.save();
+      zoomCtx.globalAlpha = (0.2 + Math.sin(elapsed * 0.004 + 1) * 0.15) * fx;
+      if (supportsFilter) zoomCtx.filter = 'blur(12px) hue-rotate(' + (hue + 120) + 'deg) brightness(150%)';
+      zoomCtx.drawImage(wordCanvas, 0, 0);
+      zoomCtx.restore();
+    }
 
-    // Main word layer with hue shift and breathing
+    // Main word layer (effects fade, clean word remains)
     zoomCtx.save();
-    if (supportsFilter) zoomCtx.filter = 'hue-rotate(' + hue + 'deg) saturate(160%) brightness(' + Math.round(pulse * 110) + '%)';
+    if (fx > 0.01 && supportsFilter) {
+      zoomCtx.filter = 'hue-rotate(' + (hue * fx) + 'deg) saturate(' + Math.round(100 + 60 * fx) + '%) brightness(' + Math.round(100 + (pulse * 10) * fx) + '%)';
+    }
     zoomCtx.translate(cw / 2, ch / 2);
     zoomCtx.scale(breathe, breathe);
     zoomCtx.translate(-cw / 2, -ch / 2);
     zoomCtx.drawImage(wordCanvas, 0, 0);
     zoomCtx.restore();
 
-    // Trippy particles
-    for (const p of particles) {
-      if (elapsed < p.delay) continue;
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += 0.05;
-      p.life -= 0.002;
-      p.hue = (p.hue + 1.5) % 360;
+    // Trippy particles (fade out during settle)
+    if (fx > 0.01) {
+      for (const p of particles) {
+        if (elapsed < p.delay) continue;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.05;
+        p.life -= 0.002;
+        p.hue = (p.hue + 1.5) % 360;
 
-      if (p.life > 0 && p.y < ch + 20) {
-        zoomCtx.beginPath();
-        zoomCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        zoomCtx.fillStyle = 'hsla(' + p.hue + ', 100%, 65%, ' + (p.life * 0.5) + ')';
-        zoomCtx.fill();
-      } else {
-        // Respawn particle from word area
-        p.x = cw * 0.15 + Math.random() * cw * 0.7;
-        p.y = ch * 0.3 + Math.random() * ch * 0.4;
-        p.vy = Math.random() * 2 + 0.5;
-        p.vx = (Math.random() - 0.5) * 1.5;
-        p.life = 0.7 + Math.random() * 0.3;
-        p.size = Math.random() * 3 + 1;
+        if (p.life > 0 && p.y < ch + 20) {
+          zoomCtx.beginPath();
+          zoomCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          zoomCtx.fillStyle = 'hsla(' + p.hue + ', 100%, 65%, ' + (p.life * 0.5 * fx) + ')';
+          zoomCtx.fill();
+        } else {
+          p.x = cw * 0.15 + Math.random() * cw * 0.7;
+          p.y = ch * 0.3 + Math.random() * ch * 0.4;
+          p.vy = Math.random() * 2 + 0.5;
+          p.vx = (Math.random() - 0.5) * 1.5;
+          p.life = 0.7 + Math.random() * 0.3;
+          p.size = Math.random() * 3 + 1;
+        }
       }
     }
 
-    if (!allFallen || elapsed < 8000) {
+    // Keep animating until fully settled
+    const settled = meltData.settleStart && (timestamp - meltData.settleStart >= 1200);
+    if (!settled) {
       meltAnimFrame = requestAnimationFrame(renderMeltFrame);
     }
   }
