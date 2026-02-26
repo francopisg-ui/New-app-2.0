@@ -479,13 +479,17 @@
   async function startCamera() {
     if (currentStream) {
       currentStream.getTracks().forEach(t => t.stop());
+      currentStream = null;
+      // Give the hardware a moment to release before re-acquiring
+      await new Promise(r => setTimeout(r, 300));
     }
     try {
+      const isFront = facingMode === 'user';
       const constraints = {
         video: {
           facingMode: facingMode,
-          width: { ideal: 4032 },
-          height: { ideal: 3024 }
+          width: { ideal: isFront ? 1920 : 4032 },
+          height: { ideal: isFront ? 1080 : 3024 }
         },
         audio: false
       };
@@ -493,7 +497,7 @@
       cameraPreview.srcObject = currentStream;
 
       // Mirror front camera preview
-      if (facingMode === 'user') {
+      if (isFront) {
         cameraPreview.classList.add('mirrored');
       } else {
         cameraPreview.classList.remove('mirrored');
@@ -507,24 +511,38 @@
   // Flip camera with smooth transition
   flipBtn.addEventListener('click', async () => {
     flipBtn.disabled = true;
-    cameraPreview.style.opacity = '0';
-    await new Promise(r => setTimeout(r, 200));
+    const previousFacingMode = facingMode;
+    try {
+      cameraPreview.style.opacity = '0';
+      await new Promise(r => setTimeout(r, 200));
 
-    facingMode = facingMode === 'environment' ? 'user' : 'environment';
-    await startCamera();
+      facingMode = facingMode === 'environment' ? 'user' : 'environment';
+      await startCamera();
 
-    // Wait for new stream to produce a frame before fading in
-    await new Promise(resolve => {
-      cameraPreview.onplaying = () => {
-        cameraPreview.onplaying = null;
-        resolve();
-      };
-      // Fallback in case onplaying doesn't fire
-      setTimeout(resolve, 500);
-    });
+      // If startCamera failed to obtain a stream, revert to previous camera
+      if (!currentStream) {
+        facingMode = previousFacingMode;
+        await startCamera();
+      }
 
-    cameraPreview.style.opacity = '1';
-    flipBtn.disabled = false;
+      // Wait for new stream to produce a frame before fading in
+      await new Promise(resolve => {
+        cameraPreview.onplaying = () => {
+          cameraPreview.onplaying = null;
+          resolve();
+        };
+        // Fallback in case onplaying doesn't fire
+        setTimeout(resolve, 500);
+      });
+    } catch (err) {
+      console.error('Flip camera error:', err);
+      // Revert to previous camera on failure
+      facingMode = previousFacingMode;
+      try { await startCamera(); } catch (_) { /* best effort */ }
+    } finally {
+      cameraPreview.style.opacity = '1';
+      flipBtn.disabled = false;
+    }
   });
 
   // Flash (visual toggle only for the look)
