@@ -29,9 +29,9 @@
   const ABYSS_FADE_END = 1000;         // Fully black by 1000x — very gradual fade
   const ABYSS_BRAIN_START = 2040;      // Brain appears while stars still fading (+20%)
   const ABYSS_BRAIN_FULL = 3840;       // Brain fills most of the screen (+20%)
-  const ABYSS_WORD_START = 120000;     // Word begins appearing once brain is deeply pixelated
-  const ABYSS_WORD_FULL = 250000;      // Word fully visible
-  const ABYSS_MAX_ZOOM = 280000;
+  const ABYSS_WORD_START = 160000;     // Word begins appearing once brain is deeply pixelated
+  const ABYSS_WORD_FULL = 320000;      // Word fully visible
+  const ABYSS_MAX_ZOOM = 350000;
 
   // X-Ray overlay image (loaded from base64 in xray-images.js)
   const brainImg = new Image();
@@ -1229,7 +1229,7 @@
 
       // Shared zoom-based movement step for stars and smoke
       const zoomDelta = Math.abs(zoom - lastWarpZoom) / zoom;
-      const step = Math.min(0.15, zoomDelta * 20);
+      const step = Math.min(0.1, zoomDelta * 12);
 
       // Warp intensity ramps up, then fades out overlapping with brain appearance
       let warpIntensity = Math.min(1, (zoom - ABYSS_FADE_END) / 500);
@@ -1391,10 +1391,10 @@
       const offsetX = (cw - totalW) / 2;
       const offsetY = (ch - totalH) / 2;
 
-      // X-ray constants (stronger shift for legibility on brain texture)
+      // X-ray constants (subtle shift to blend with brain texture)
       const SHIFT = 12;
       const BLEND = 0.65;
-      const DITHER = 0.95;
+      const DITHER = 0.87;
 
       function seededRand(x, y) {
         let h = (x * 374761393 + y * 668265263 + 1274126177) | 0;
