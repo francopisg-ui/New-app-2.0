@@ -651,6 +651,8 @@
     cachedEdgeGrid = null;
     cachedCanvasSnapshot = null;
     cachedAbyssWordGrid = null;
+    cachedAbyssEdgeGrid = null;
+    cachedBrainPixels = null;
     faceGuideCircle.classList.add('hidden');
 
     // Use max zoom for abyss
@@ -1063,6 +1065,8 @@
 
   // --- Black Abyss Rendering ---
   let cachedAbyssWordGrid = null;
+  let cachedAbyssEdgeGrid = null;
+  let cachedBrainPixels = null; // ImageData sampled from brain render
 
   // Hyperspace warp star field — stars only advance when renderViewer is called (on pinch)
   const WARP_STAR_COUNT = 300;
@@ -1280,7 +1284,7 @@
       zoomCtx.restore();
     }
 
-    // Phase 4: Word subtly revealed inside the brain (x-ray style)
+    // Phase 4: Word subtly revealed inside the brain (x-ray style pixel blending)
     if (zoom >= ABYSS_WORD_START && secretWord && brainImg.complete && brainImg.naturalWidth) {
       // Continue drawing the brain at full size as background
       zoomCtx.fillStyle = '#000';
@@ -1300,56 +1304,152 @@
       const bx = (cw - bw) / 2;
       const by = (ch - bh) / 2;
 
-      // Brain fades slightly as word emerges
-      const brainFade = 1 - zoomInProg * 0.4;
-      zoomCtx.save();
-      zoomCtx.globalAlpha = 0.85 * brainFade;
+      // Draw brain at full opacity first
       zoomCtx.drawImage(brainImg, bx, by, bw, bh);
-      zoomCtx.restore();
 
-      // Build word grid if needed
+      // Build word grid + edge grid once (same algorithm as x-ray mode)
       if (!cachedAbyssWordGrid) {
         cachedAbyssWordGrid = buildWordGrid(secretWord);
+        if (cachedAbyssWordGrid && cachedAbyssWordGrid.length > 0) {
+          const gh = cachedAbyssWordGrid.length;
+          const gw = cachedAbyssWordGrid[0].length;
+          cachedAbyssEdgeGrid = [];
+
+          // Compute Euclidean distance to nearest non-letter cell
+          for (let y = 0; y < gh; y++) {
+            cachedAbyssEdgeGrid[y] = [];
+            for (let x = 0; x < gw; x++) {
+              if (cachedAbyssWordGrid[y][x] !== 1) {
+                cachedAbyssEdgeGrid[y][x] = 0;
+                continue;
+              }
+              let minDist = Infinity;
+              for (let dy = -3; dy <= 3; dy++) {
+                for (let dx = -3; dx <= 3; dx++) {
+                  if (dy === 0 && dx === 0) continue;
+                  const ny = y + dy;
+                  const nx = x + dx;
+                  const isLetter = (ny >= 0 && ny < gh && nx >= 0 && nx < gw) ? cachedAbyssWordGrid[ny][nx] === 1 : false;
+                  if (!isLetter) {
+                    const dist = Math.sqrt(dy * dy + dx * dx);
+                    if (dist < minDist) minDist = dist;
+                  }
+                }
+              }
+              cachedAbyssEdgeGrid[y][x] = minDist === Infinity ? 1 : minDist;
+            }
+          }
+
+          // Normalize with squared curve: edges nearly invisible, only deep interior shifts
+          let maxDist = 0;
+          for (let y = 0; y < gh; y++) {
+            for (let x = 0; x < gw; x++) {
+              if (cachedAbyssEdgeGrid[y][x] > maxDist) maxDist = cachedAbyssEdgeGrid[y][x];
+            }
+          }
+          if (maxDist > 0) {
+            for (let y = 0; y < gh; y++) {
+              for (let x = 0; x < gw; x++) {
+                if (cachedAbyssWordGrid[y][x] === 1) {
+                  const t = cachedAbyssEdgeGrid[y][x] / maxDist;
+                  cachedAbyssEdgeGrid[y][x] = 0.02 + 0.98 * (t * t);
+                }
+              }
+            }
+          }
+        }
       }
       if (!cachedAbyssWordGrid || cachedAbyssWordGrid.length === 0) return;
+
+      // Sample brain pixels from the canvas (re-sample when brain size changes significantly)
+      const brainPixelData = zoomCtx.getImageData(0, 0, cw, ch);
 
       const grid = cachedAbyssWordGrid;
       const gridH = grid.length;
       const gridW = grid[0].length;
 
-      // Word fades in subtly
+      // Word positioning centered on the brain
       const wordOpacity = Math.min(1, (zoom - ABYSS_WORD_START) / ((ABYSS_WORD_FULL - ABYSS_WORD_START) * 0.4));
 
-      // Word size grows within the brain
+      // Word scale: each grid cell maps to a region of screen pixels
       const wordSizeProg = Math.min(1, (zoom - ABYSS_WORD_START) / (ABYSS_WORD_FULL - ABYSS_WORD_START));
       const wordEased = 1 - Math.pow(1 - wordSizeProg, 2);
-      const tinySize = minDim * 0.02 / Math.max(gridW, gridH);
-      const fullSize = minDim * 0.5 / Math.max(gridW, gridH);
-      const pixelSize = tinySize + (fullSize - tinySize) * wordEased;
+      const tinyCell = minDim * 0.02 / Math.max(gridW, gridH);
+      const fullCell = minDim * 0.5 / Math.max(gridW, gridH);
+      const cellSize = tinyCell + (fullCell - tinyCell) * wordEased;
 
-      const totalW = gridW * pixelSize;
-      const totalH = gridH * pixelSize;
+      const totalW = gridW * cellSize;
+      const totalH = gridH * cellSize;
       const offsetX = (cw - totalW) / 2;
       const offsetY = (ch - totalH) / 2;
 
-      // Subtle x-ray style: soft white with slight cyan tint
-      zoomCtx.save();
-      zoomCtx.globalAlpha = wordOpacity * 0.7;
-      zoomCtx.globalCompositeOperation = 'screen';
+      // X-ray constants (match renderSecretOverlay)
+      const SHIFT = 18;
+      const BLEND = 0.50;
+      const DITHER = 0.95;
 
-      for (let row = 0; row < gridH; row++) {
-        for (let col = 0; col < gridW; col++) {
-          if (grid[row][col] !== 1) continue;
-          zoomCtx.fillStyle = 'rgba(220, 230, 240, 1)';
+      function seededRand(x, y) {
+        let h = (x * 374761393 + y * 668265263 + 1274126177) | 0;
+        h = ((h ^ (h >> 13)) * 1103515245) | 0;
+        return ((h & 0x7fffffff) / 0x7fffffff);
+      }
+
+      zoomCtx.globalAlpha = wordOpacity;
+
+      for (let gy = 0; gy < gridH; gy++) {
+        for (let gx = 0; gx < gridW; gx++) {
+          if (grid[gy][gx] !== 1) continue;
+
+          // Screen position for this grid cell (center of cell)
+          const sx = Math.floor(offsetX + (gx + 0.5) * cellSize);
+          const sy = Math.floor(offsetY + (gy + 0.5) * cellSize);
+
+          // Bounds check
+          if (sx < 0 || sx >= cw || sy < 0 || sy >= ch) continue;
+
+          // Dither: skip random subset, edges skip more
+          const rand = seededRand(gx, gy);
+          const ef = cachedAbyssEdgeGrid[gy][gx];
+          if (rand > DITHER * ef) continue;
+
+          // Sample the brain pixel at this screen position
+          const idx = (sy * cw + sx) * 4;
+          const origR = brainPixelData.data[idx];
+          const origG = brainPixelData.data[idx + 1];
+          const origB = brainPixelData.data[idx + 2];
+          const brightness = (origR + origG + origB) / 3;
+
+          // Per-pixel noise on shift amount ±20%
+          const noise = 0.8 + seededRand(gx + 999, gy + 777) * 0.4;
+          const shift = Math.round(SHIFT * ef * noise);
+
+          let sr, sg, sb;
+          if (brightness > 128) {
+            sr = Math.max(0, origR - shift);
+            sg = Math.max(0, origG - shift);
+            sb = Math.max(0, origB - shift);
+          } else {
+            sr = Math.min(255, origR + shift);
+            sg = Math.min(255, origG + shift);
+            sb = Math.min(255, origB + shift);
+          }
+
+          // Alpha blend shifted with original
+          const nr = Math.round(origR + (sr - origR) * BLEND);
+          const ng = Math.round(origG + (sg - origG) * BLEND);
+          const nb = Math.round(origB + (sb - origB) * BLEND);
+
+          zoomCtx.fillStyle = `rgb(${nr},${ng},${nb})`;
           zoomCtx.fillRect(
-            offsetX + col * pixelSize,
-            offsetY + row * pixelSize,
-            pixelSize,
-            pixelSize
+            offsetX + gx * cellSize,
+            offsetY + gy * cellSize,
+            cellSize,
+            cellSize
           );
         }
       }
-      zoomCtx.restore();
+
+      zoomCtx.globalAlpha = 1;
     }
   }
 
@@ -2386,6 +2486,8 @@
       xrayMode = false;
       abyssMode = false;
       cachedAbyssWordGrid = null;
+      cachedAbyssEdgeGrid = null;
+      cachedBrainPixels = null;
       viewerMaxZoom = 500000;
       faceGuideCircle.classList.add('hidden');
       viewerZoom = 1;
