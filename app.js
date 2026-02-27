@@ -1335,95 +1335,295 @@
     ctx.globalAlpha = alpha;
     ctx.translate(cx, cy);
 
-    // Scale factors
     const sw = skullW / 2;
     const sh = skullH / 2;
+    const lw = Math.max(1, skullW * 0.005);
+    // Bone color palette (varying density like real x-ray)
+    const boneBright = 'rgba(230, 235, 240, ';
+    const boneMed    = 'rgba(190, 200, 215, ';
+    const boneDim    = 'rgba(140, 155, 175, ';
+    const boneGhost  = 'rgba(100, 115, 135, ';
+    const voidColor  = 'rgba(0, 0, 5, ';
 
-    // --- Cranium (dome) ---
+    // --- Outer glow (x-ray scatter) ---
+    const skullGlow = ctx.createRadialGradient(0, -sh * 0.1, sw * 0.3, 0, -sh * 0.1, sw * 1.2);
+    skullGlow.addColorStop(0, 'rgba(180, 200, 220, ' + (alpha * 0.08) + ')');
+    skullGlow.addColorStop(0.5, 'rgba(100, 130, 160, ' + (alpha * 0.03) + ')');
+    skullGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = skullGlow;
+    ctx.fillRect(-sw * 1.5, -sh * 1.5, sw * 3, sh * 3);
+
+    // --- Cranium outer shape ---
     ctx.beginPath();
-    ctx.moveTo(-sw * 0.75, sh * 0.1);
-    ctx.bezierCurveTo(-sw * 0.85, -sh * 0.3, -sw * 0.7, -sh * 0.85, 0, -sh * 0.95);
-    ctx.bezierCurveTo(sw * 0.7, -sh * 0.85, sw * 0.85, -sh * 0.3, sw * 0.75, sh * 0.1);
-    // Cheekbones down to jaw
-    ctx.bezierCurveTo(sw * 0.8, sh * 0.25, sw * 0.65, sh * 0.45, sw * 0.4, sh * 0.7);
-    ctx.bezierCurveTo(sw * 0.3, sh * 0.85, sw * 0.15, sh * 0.95, 0, sh);
-    ctx.bezierCurveTo(-sw * 0.15, sh * 0.95, -sw * 0.3, sh * 0.85, -sw * 0.4, sh * 0.7);
-    ctx.bezierCurveTo(-sw * 0.65, sh * 0.45, -sw * 0.8, sh * 0.25, -sw * 0.75, sh * 0.1);
+    ctx.moveTo(-sw * 0.78, sh * 0.08);
+    ctx.bezierCurveTo(-sw * 0.88, -sh * 0.15, -sw * 0.85, -sh * 0.55, -sw * 0.65, -sh * 0.8);
+    ctx.bezierCurveTo(-sw * 0.45, -sh * 0.95, -sw * 0.2, -sh, 0, -sh);
+    ctx.bezierCurveTo(sw * 0.2, -sh, sw * 0.45, -sh * 0.95, sw * 0.65, -sh * 0.8);
+    ctx.bezierCurveTo(sw * 0.85, -sh * 0.55, sw * 0.88, -sh * 0.15, sw * 0.78, sh * 0.08);
+    // Zygomatic arches (cheekbones) bulge outward
+    ctx.bezierCurveTo(sw * 0.88, sh * 0.15, sw * 0.85, sh * 0.25, sw * 0.75, sh * 0.3);
+    ctx.bezierCurveTo(sw * 0.65, sh * 0.35, sw * 0.55, sh * 0.38, sw * 0.5, sh * 0.42);
+    // Down to mandible (jaw)
+    ctx.bezierCurveTo(sw * 0.52, sh * 0.55, sw * 0.5, sh * 0.7, sw * 0.4, sh * 0.82);
+    ctx.bezierCurveTo(sw * 0.3, sh * 0.92, sw * 0.15, sh * 0.98, 0, sh);
+    ctx.bezierCurveTo(-sw * 0.15, sh * 0.98, -sw * 0.3, sh * 0.92, -sw * 0.4, sh * 0.82);
+    ctx.bezierCurveTo(-sw * 0.5, sh * 0.7, -sw * 0.52, sh * 0.55, -sw * 0.5, sh * 0.42);
+    ctx.bezierCurveTo(-sw * 0.55, sh * 0.38, -sw * 0.65, sh * 0.35, -sw * 0.75, sh * 0.3);
+    ctx.bezierCurveTo(-sw * 0.85, sh * 0.25, -sw * 0.88, sh * 0.15, -sw * 0.78, sh * 0.08);
     ctx.closePath();
-    ctx.strokeStyle = 'rgba(220, 230, 240, ' + (alpha * 0.7) + ')';
-    ctx.lineWidth = Math.max(1, skullW * 0.008);
-    ctx.stroke();
-    // Faint fill
-    ctx.fillStyle = 'rgba(200, 215, 230, ' + (alpha * 0.06) + ')';
+    // Dense bone fill with gradient
+    const craniumGrad = ctx.createLinearGradient(0, -sh, 0, sh);
+    craniumGrad.addColorStop(0, boneMed + (alpha * 0.12) + ')');
+    craniumGrad.addColorStop(0.3, boneBright + (alpha * 0.1) + ')');
+    craniumGrad.addColorStop(0.6, boneMed + (alpha * 0.08) + ')');
+    craniumGrad.addColorStop(1, boneDim + (alpha * 0.06) + ')');
+    ctx.fillStyle = craniumGrad;
     ctx.fill();
+    ctx.strokeStyle = boneBright + (alpha * 0.6) + ')';
+    ctx.lineWidth = lw * 1.5;
+    ctx.stroke();
 
-    // --- Eye sockets ---
-    for (let side = -1; side <= 1; side += 2) {
+    // --- Inner cranium line (bone thickness) ---
+    ctx.beginPath();
+    ctx.moveTo(-sw * 0.7, sh * 0.05);
+    ctx.bezierCurveTo(-sw * 0.78, -sh * 0.15, -sw * 0.75, -sh * 0.5, -sw * 0.58, -sh * 0.72);
+    ctx.bezierCurveTo(-sw * 0.4, -sh * 0.87, -sw * 0.18, -sh * 0.92, 0, -sh * 0.92);
+    ctx.bezierCurveTo(sw * 0.18, -sh * 0.92, sw * 0.4, -sh * 0.87, sw * 0.58, -sh * 0.72);
+    ctx.bezierCurveTo(sw * 0.75, -sh * 0.5, sw * 0.78, -sh * 0.15, sw * 0.7, sh * 0.05);
+    ctx.strokeStyle = boneDim + (alpha * 0.3) + ')';
+    ctx.lineWidth = lw * 0.8;
+    ctx.stroke();
+
+    // --- Coronal suture (top of skull, side to side) ---
+    ctx.beginPath();
+    ctx.moveTo(-sw * 0.55, -sh * 0.65);
+    var sx = -sw * 0.45;
+    for (var si = 0; si < 8; si++) {
+      var zigY = -sh * 0.7 + (si % 2 === 0 ? -sh * 0.04 : sh * 0.04);
+      sx += sw * 0.12;
+      ctx.lineTo(sx, zigY);
+    }
+    ctx.strokeStyle = boneGhost + (alpha * 0.25) + ')';
+    ctx.lineWidth = lw * 0.6;
+    ctx.stroke();
+
+    // --- Sagittal suture (midline, top to front) ---
+    ctx.beginPath();
+    ctx.moveTo(0, -sh * 0.98);
+    ctx.lineTo(sw * 0.01, -sh * 0.85);
+    ctx.lineTo(-sw * 0.01, -sh * 0.72);
+    ctx.lineTo(sw * 0.01, -sh * 0.6);
+    ctx.strokeStyle = boneGhost + (alpha * 0.2) + ')';
+    ctx.lineWidth = lw * 0.5;
+    ctx.stroke();
+
+    // --- Supraorbital ridge (brow bone) ---
+    ctx.beginPath();
+    ctx.moveTo(-sw * 0.62, -sh * 0.12);
+    ctx.bezierCurveTo(-sw * 0.5, -sh * 0.22, -sw * 0.25, -sh * 0.26, 0, -sh * 0.24);
+    ctx.bezierCurveTo(sw * 0.25, -sh * 0.26, sw * 0.5, -sh * 0.22, sw * 0.62, -sh * 0.12);
+    ctx.strokeStyle = boneBright + (alpha * 0.55) + ')';
+    ctx.lineWidth = lw * 2;
+    ctx.stroke();
+    // Thinner secondary ridge line
+    ctx.beginPath();
+    ctx.moveTo(-sw * 0.58, -sh * 0.09);
+    ctx.bezierCurveTo(-sw * 0.45, -sh * 0.17, -sw * 0.22, -sh * 0.2, 0, -sh * 0.19);
+    ctx.bezierCurveTo(sw * 0.22, -sh * 0.2, sw * 0.45, -sh * 0.17, sw * 0.58, -sh * 0.09);
+    ctx.strokeStyle = boneDim + (alpha * 0.3) + ')';
+    ctx.lineWidth = lw * 0.7;
+    ctx.stroke();
+
+    // --- Eye sockets (orbital cavities) ---
+    for (var side = -1; side <= 1; side += 2) {
+      var ex = side * sw * 0.32;
+      var ey = -sh * 0.02;
+      var erx = sw * 0.22;
+      var ery = sh * 0.16;
+      // Dark void
       ctx.beginPath();
-      const ex = side * sw * 0.32;
-      const ey = -sh * 0.05;
-      const erx = sw * 0.2;
-      const ery = sh * 0.15;
       ctx.ellipse(ex, ey, erx, ery, 0, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(0, 0, 0, ' + (alpha * 0.8) + ')';
+      ctx.fillStyle = voidColor + (alpha * 0.9) + ')';
       ctx.fill();
-      ctx.strokeStyle = 'rgba(200, 215, 230, ' + (alpha * 0.5) + ')';
-      ctx.lineWidth = Math.max(1, skullW * 0.006);
+      // Bright orbital rim (dense bone edge)
+      ctx.strokeStyle = boneBright + (alpha * 0.7) + ')';
+      ctx.lineWidth = lw * 1.8;
+      ctx.stroke();
+      // Inner rim (bone depth)
+      ctx.beginPath();
+      ctx.ellipse(ex, ey, erx * 0.85, ery * 0.85, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = boneDim + (alpha * 0.35) + ')';
+      ctx.lineWidth = lw * 0.7;
+      ctx.stroke();
+      // Orbital floor shadow
+      ctx.beginPath();
+      ctx.ellipse(ex, ey + ery * 0.15, erx * 0.7, ery * 0.5, 0, 0.2, Math.PI - 0.2);
+      ctx.strokeStyle = boneGhost + (alpha * 0.2) + ')';
+      ctx.lineWidth = lw * 0.5;
       ctx.stroke();
     }
 
-    // --- Nasal cavity ---
+    // --- Nasal cavity (pear-shaped) ---
+    ctx.beginPath();
+    ctx.moveTo(0, sh * 0.05);
+    ctx.bezierCurveTo(-sw * 0.04, sh * 0.08, -sw * 0.12, sh * 0.15, -sw * 0.11, sh * 0.25);
+    ctx.bezierCurveTo(-sw * 0.1, sh * 0.32, -sw * 0.06, sh * 0.37, 0, sh * 0.38);
+    ctx.bezierCurveTo(sw * 0.06, sh * 0.37, sw * 0.1, sh * 0.32, sw * 0.11, sh * 0.25);
+    ctx.bezierCurveTo(sw * 0.12, sh * 0.15, sw * 0.04, sh * 0.08, 0, sh * 0.05);
+    ctx.closePath();
+    ctx.fillStyle = voidColor + (alpha * 0.85) + ')';
+    ctx.fill();
+    ctx.strokeStyle = boneBright + (alpha * 0.55) + ')';
+    ctx.lineWidth = lw * 1.2;
+    ctx.stroke();
+    // Nasal septum (divider)
     ctx.beginPath();
     ctx.moveTo(0, sh * 0.08);
-    ctx.lineTo(-sw * 0.08, sh * 0.3);
-    ctx.bezierCurveTo(-sw * 0.06, sh * 0.35, sw * 0.06, sh * 0.35, sw * 0.08, sh * 0.3);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(0, 0, 0, ' + (alpha * 0.7) + ')';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(200, 215, 230, ' + (alpha * 0.4) + ')';
-    ctx.lineWidth = Math.max(1, skullW * 0.004);
+    ctx.lineTo(0, sh * 0.35);
+    ctx.strokeStyle = boneDim + (alpha * 0.35) + ')';
+    ctx.lineWidth = lw * 0.6;
+    ctx.stroke();
+    // Nasal bones (bridge of nose)
+    ctx.beginPath();
+    ctx.moveTo(-sw * 0.06, -sh * 0.12);
+    ctx.lineTo(-sw * 0.04, sh * 0.06);
+    ctx.moveTo(sw * 0.06, -sh * 0.12);
+    ctx.lineTo(sw * 0.04, sh * 0.06);
+    ctx.strokeStyle = boneMed + (alpha * 0.3) + ')';
+    ctx.lineWidth = lw * 0.7;
     ctx.stroke();
 
-    // --- Teeth (upper row) ---
-    const teethY = sh * 0.5;
-    const teethCount = 8;
-    const toothW = sw * 0.1;
-    const toothH = sh * 0.1;
-    const teethStartX = -(teethCount * toothW) / 2;
-    ctx.fillStyle = 'rgba(220, 225, 230, ' + (alpha * 0.5) + ')';
-    ctx.strokeStyle = 'rgba(180, 190, 200, ' + (alpha * 0.3) + ')';
-    ctx.lineWidth = Math.max(0.5, skullW * 0.003);
-    for (let i = 0; i < teethCount; i++) {
-      const tx = teethStartX + i * toothW + toothW * 0.1;
-      ctx.fillRect(tx, teethY, toothW * 0.8, toothH);
-      ctx.strokeRect(tx, teethY, toothW * 0.8, toothH);
+    // --- Zygomatic arches (cheekbones) ---
+    for (var zside = -1; zside <= 1; zside += 2) {
+      ctx.beginPath();
+      ctx.moveTo(zside * sw * 0.5, sh * 0.08);
+      ctx.bezierCurveTo(zside * sw * 0.7, sh * 0.05, zside * sw * 0.82, sh * 0.12, zside * sw * 0.8, sh * 0.22);
+      ctx.strokeStyle = boneBright + (alpha * 0.45) + ')';
+      ctx.lineWidth = lw * 1.5;
+      ctx.stroke();
+      // Zygomatic arch bone detail
+      ctx.beginPath();
+      ctx.moveTo(zside * sw * 0.52, sh * 0.12);
+      ctx.bezierCurveTo(zside * sw * 0.68, sh * 0.1, zside * sw * 0.78, sh * 0.16, zside * sw * 0.76, sh * 0.25);
+      ctx.strokeStyle = boneDim + (alpha * 0.25) + ')';
+      ctx.lineWidth = lw * 0.6;
+      ctx.stroke();
+    }
+
+    // --- Maxilla (upper jaw bone) ---
+    ctx.beginPath();
+    ctx.moveTo(-sw * 0.42, sh * 0.35);
+    ctx.bezierCurveTo(-sw * 0.38, sh * 0.42, -sw * 0.2, sh * 0.48, 0, sh * 0.48);
+    ctx.bezierCurveTo(sw * 0.2, sh * 0.48, sw * 0.38, sh * 0.42, sw * 0.42, sh * 0.35);
+    ctx.strokeStyle = boneMed + (alpha * 0.35) + ')';
+    ctx.lineWidth = lw;
+    ctx.stroke();
+
+    // --- Upper teeth ---
+    var teethY = sh * 0.48;
+    var teethCount = 10;
+    var teethSpan = sw * 0.8;
+    var toothW = teethSpan / teethCount;
+    var toothH = sh * 0.09;
+    ctx.fillStyle = boneBright + (alpha * 0.55) + ')';
+    ctx.strokeStyle = boneDim + (alpha * 0.4) + ')';
+    ctx.lineWidth = lw * 0.5;
+    for (var ti = 0; ti < teethCount; ti++) {
+      var tx = -teethSpan / 2 + ti * toothW + toothW * 0.08;
+      var tw = toothW * 0.84;
+      // Front teeth taller, side teeth shorter
+      var distFromCenter = Math.abs(ti - (teethCount - 1) / 2) / (teethCount / 2);
+      var th = toothH * (1 - distFromCenter * 0.3);
+      // Rounded tooth shape
+      ctx.beginPath();
+      ctx.moveTo(tx + tw * 0.15, teethY);
+      ctx.lineTo(tx + tw * 0.85, teethY);
+      ctx.bezierCurveTo(tx + tw, teethY + th * 0.3, tx + tw, teethY + th * 0.7, tx + tw * 0.7, teethY + th);
+      ctx.bezierCurveTo(tx + tw * 0.5, teethY + th * 1.05, tx + tw * 0.3, teethY + th, tx + tw * 0.15, teethY + th * 0.85);
+      ctx.bezierCurveTo(tx, teethY + th * 0.6, tx, teethY + th * 0.3, tx + tw * 0.15, teethY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
     }
 
     // --- Lower teeth ---
-    const lowerTeethY = teethY + toothH + sh * 0.02;
-    for (let i = 0; i < teethCount; i++) {
-      const tx = teethStartX + i * toothW + toothW * 0.1;
-      ctx.fillRect(tx, lowerTeethY, toothW * 0.8, toothH * 0.9);
-      ctx.strokeRect(tx, lowerTeethY, toothW * 0.8, toothH * 0.9);
-    }
-
-    // --- Temporal bone lines ---
-    ctx.strokeStyle = 'rgba(200, 215, 230, ' + (alpha * 0.2) + ')';
-    ctx.lineWidth = Math.max(0.5, skullW * 0.003);
-    for (let side = -1; side <= 1; side += 2) {
+    var lteethY = teethY + toothH + sh * 0.015;
+    ctx.fillStyle = boneBright + (alpha * 0.5) + ')';
+    for (var li = 0; li < teethCount; li++) {
+      var ltx = -teethSpan / 2 + li * toothW + toothW * 0.08;
+      var ltw = toothW * 0.84;
+      var ldist = Math.abs(li - (teethCount - 1) / 2) / (teethCount / 2);
+      var lth = toothH * 0.85 * (1 - ldist * 0.25);
       ctx.beginPath();
-      ctx.moveTo(side * sw * 0.6, -sh * 0.5);
-      ctx.bezierCurveTo(side * sw * 0.65, -sh * 0.2, side * sw * 0.55, sh * 0.1, side * sw * 0.5, sh * 0.3);
+      ctx.moveTo(ltx + ltw * 0.15, lteethY + lth);
+      ctx.lineTo(ltx + ltw * 0.85, lteethY + lth);
+      ctx.bezierCurveTo(ltx + ltw, lteethY + lth * 0.7, ltx + ltw, lteethY + lth * 0.3, ltx + ltw * 0.7, lteethY);
+      ctx.bezierCurveTo(ltx + ltw * 0.5, lteethY - lth * 0.05, ltx + ltw * 0.3, lteethY, ltx + ltw * 0.15, lteethY + lth * 0.15);
+      ctx.bezierCurveTo(ltx, lteethY + lth * 0.3, ltx, lteethY + lth * 0.7, ltx + ltw * 0.15, lteethY + lth);
+      ctx.closePath();
+      ctx.fill();
       ctx.stroke();
     }
 
-    // --- Brow ridge ---
+    // --- Mandible (jawbone) outline ---
     ctx.beginPath();
-    ctx.moveTo(-sw * 0.55, -sh * 0.15);
-    ctx.bezierCurveTo(-sw * 0.3, -sh * 0.22, sw * 0.3, -sh * 0.22, sw * 0.55, -sh * 0.15);
-    ctx.strokeStyle = 'rgba(200, 215, 230, ' + (alpha * 0.35) + ')';
-    ctx.lineWidth = Math.max(1, skullW * 0.005);
+    ctx.moveTo(-sw * 0.48, sh * 0.42);
+    ctx.bezierCurveTo(-sw * 0.52, sh * 0.55, -sw * 0.5, sh * 0.7, -sw * 0.4, sh * 0.8);
+    ctx.bezierCurveTo(-sw * 0.3, sh * 0.9, -sw * 0.15, sh * 0.96, 0, sh * 0.97);
+    ctx.bezierCurveTo(sw * 0.15, sh * 0.96, sw * 0.3, sh * 0.9, sw * 0.4, sh * 0.8);
+    ctx.bezierCurveTo(sw * 0.5, sh * 0.7, sw * 0.52, sh * 0.55, sw * 0.48, sh * 0.42);
+    ctx.strokeStyle = boneBright + (alpha * 0.5) + ')';
+    ctx.lineWidth = lw * 1.5;
     ctx.stroke();
+    // Mental protuberance (chin bump)
+    ctx.beginPath();
+    ctx.moveTo(-sw * 0.12, sh * 0.9);
+    ctx.bezierCurveTo(-sw * 0.08, sh * 0.96, sw * 0.08, sh * 0.96, sw * 0.12, sh * 0.9);
+    ctx.strokeStyle = boneMed + (alpha * 0.35) + ')';
+    ctx.lineWidth = lw;
+    ctx.stroke();
+
+    // --- Temporal bone lines (both sides) ---
+    for (var tside = -1; tside <= 1; tside += 2) {
+      // Temporal line
+      ctx.beginPath();
+      ctx.moveTo(tside * sw * 0.65, -sh * 0.55);
+      ctx.bezierCurveTo(tside * sw * 0.72, -sh * 0.35, tside * sw * 0.7, -sh * 0.1, tside * sw * 0.65, sh * 0.05);
+      ctx.strokeStyle = boneGhost + (alpha * 0.2) + ')';
+      ctx.lineWidth = lw * 0.5;
+      ctx.stroke();
+      // Mastoid process (behind ear area)
+      ctx.beginPath();
+      ctx.moveTo(tside * sw * 0.72, sh * 0.12);
+      ctx.bezierCurveTo(tside * sw * 0.78, sh * 0.2, tside * sw * 0.75, sh * 0.32, tside * sw * 0.68, sh * 0.35);
+      ctx.strokeStyle = boneDim + (alpha * 0.2) + ')';
+      ctx.lineWidth = lw * 0.6;
+      ctx.stroke();
+    }
+
+    // --- Sphenoid bone hint (behind eyes) ---
+    ctx.beginPath();
+    ctx.moveTo(-sw * 0.15, sh * 0.02);
+    ctx.bezierCurveTo(-sw * 0.1, sh * 0.05, sw * 0.1, sh * 0.05, sw * 0.15, sh * 0.02);
+    ctx.strokeStyle = boneGhost + (alpha * 0.15) + ')';
+    ctx.lineWidth = lw * 0.4;
+    ctx.stroke();
+
+    // --- Bone density texture (subtle noise-like marks) ---
+    ctx.strokeStyle = boneGhost + (alpha * 0.1) + ')';
+    ctx.lineWidth = lw * 0.3;
+    // Pseudo-random bone texture marks on cranium
+    var markSeed = 42;
+    for (var mi = 0; mi < 20; mi++) {
+      markSeed = (markSeed * 1103515245 + 12345) & 0x7fffffff;
+      var mx = (markSeed % 1000 / 500 - 1) * sw * 0.6;
+      markSeed = (markSeed * 1103515245 + 12345) & 0x7fffffff;
+      var my = (markSeed % 1000 / 500 - 1) * sh * 0.5 - sh * 0.3;
+      ctx.beginPath();
+      ctx.moveTo(mx, my);
+      ctx.lineTo(mx + sw * 0.04, my + sh * 0.02);
+      ctx.stroke();
+    }
 
     ctx.restore();
   }
@@ -1434,58 +1634,221 @@
     ctx.globalAlpha = alpha;
     ctx.translate(cx, cy);
 
-    const bw = brainW / 2;
-    const bh = brainH / 2;
+    var bw = brainW / 2;
+    var bh = brainH / 2;
+    var lw = Math.max(1, brainW * 0.004);
 
-    // Brain glow
-    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(bw, bh));
-    grad.addColorStop(0, 'rgba(100, 140, 180, ' + (alpha * 0.15) + ')');
-    grad.addColorStop(0.5, 'rgba(60, 100, 150, ' + (alpha * 0.08) + ')');
-    grad.addColorStop(1, 'rgba(20, 40, 80, 0)');
-    ctx.fillStyle = grad;
+    // Cyan/blue color palette (holographic glow)
+    var cyanBright = 'rgba(0, 220, 255, ';
+    var cyanMed    = 'rgba(0, 170, 220, ';
+    var cyanDim    = 'rgba(0, 120, 180, ';
+    var cyanGhost  = 'rgba(0, 80, 140, ';
+    var cyanDeep   = 'rgba(0, 40, 80, ';
+
+    // --- Outer holographic glow (large, soft) ---
+    var outerGlow = ctx.createRadialGradient(0, -bh * 0.1, 0, 0, -bh * 0.1, Math.max(bw, bh) * 1.8);
+    outerGlow.addColorStop(0, 'rgba(0, 200, 255, ' + (alpha * 0.2) + ')');
+    outerGlow.addColorStop(0.3, 'rgba(0, 150, 220, ' + (alpha * 0.1) + ')');
+    outerGlow.addColorStop(0.6, 'rgba(0, 80, 160, ' + (alpha * 0.04) + ')');
+    outerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = outerGlow;
+    ctx.fillRect(-bw * 2, -bh * 2, bw * 4, bh * 4);
+
+    // --- Inner core glow (bright center) ---
+    var coreGlow = ctx.createRadialGradient(0, -bh * 0.05, 0, 0, -bh * 0.05, Math.max(bw, bh) * 0.7);
+    coreGlow.addColorStop(0, 'rgba(0, 240, 255, ' + (alpha * 0.15) + ')');
+    coreGlow.addColorStop(0.5, 'rgba(0, 180, 230, ' + (alpha * 0.06) + ')');
+    coreGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = coreGlow;
     ctx.fillRect(-bw * 1.5, -bh * 1.5, bw * 3, bh * 3);
 
-    // Left hemisphere
-    ctx.beginPath();
-    ctx.moveTo(-bw * 0.05, -bh * 0.8);
-    ctx.bezierCurveTo(-bw * 0.5, -bh * 0.9, -bw * 0.9, -bh * 0.5, -bw * 0.85, 0);
-    ctx.bezierCurveTo(-bw * 0.9, bh * 0.4, -bw * 0.6, bh * 0.8, -bw * 0.1, bh * 0.7);
-    ctx.bezierCurveTo(-bw * 0.05, bh * 0.4, -bw * 0.05, -bh * 0.4, -bw * 0.05, -bh * 0.8);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(80, 120, 160, ' + (alpha * 0.12) + ')';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(140, 180, 210, ' + (alpha * 0.4) + ')';
-    ctx.lineWidth = Math.max(1, brainW * 0.005);
-    ctx.stroke();
+    // Helper: draw one hemisphere shape as a path
+    function hemispherePathLeft() {
+      ctx.beginPath();
+      // Top of brain, left side
+      ctx.moveTo(-bw * 0.04, -bh * 0.85);
+      // Frontal lobe (top front)
+      ctx.bezierCurveTo(-bw * 0.25, -bh * 0.95, -bw * 0.55, -bh * 0.9, -bw * 0.75, -bh * 0.7);
+      // Parietal lobe (top side)
+      ctx.bezierCurveTo(-bw * 0.9, -bh * 0.5, -bw * 0.95, -bh * 0.2, -bw * 0.92, bh * 0.05);
+      // Temporal lobe (side bulge)
+      ctx.bezierCurveTo(-bw * 0.95, bh * 0.25, -bw * 0.88, bh * 0.45, -bw * 0.7, bh * 0.55);
+      // Occipital lobe (back bottom)
+      ctx.bezierCurveTo(-bw * 0.5, bh * 0.65, -bw * 0.3, bh * 0.6, -bw * 0.15, bh * 0.5);
+      // Cerebellum area
+      ctx.bezierCurveTo(-bw * 0.1, bh * 0.4, -bw * 0.06, bh * 0.2, -bw * 0.04, bh * 0.0);
+      // Back up the midline
+      ctx.bezierCurveTo(-bw * 0.04, -bh * 0.3, -bw * 0.04, -bh * 0.6, -bw * 0.04, -bh * 0.85);
+      ctx.closePath();
+    }
 
-    // Right hemisphere
-    ctx.beginPath();
-    ctx.moveTo(bw * 0.05, -bh * 0.8);
-    ctx.bezierCurveTo(bw * 0.5, -bh * 0.9, bw * 0.9, -bh * 0.5, bw * 0.85, 0);
-    ctx.bezierCurveTo(bw * 0.9, bh * 0.4, bw * 0.6, bh * 0.8, bw * 0.1, bh * 0.7);
-    ctx.bezierCurveTo(bw * 0.05, bh * 0.4, bw * 0.05, -bh * 0.4, bw * 0.05, -bh * 0.8);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(80, 120, 160, ' + (alpha * 0.12) + ')';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(140, 180, 210, ' + (alpha * 0.4) + ')';
-    ctx.stroke();
+    function hemispherePathRight() {
+      ctx.beginPath();
+      ctx.moveTo(bw * 0.04, -bh * 0.85);
+      ctx.bezierCurveTo(bw * 0.25, -bh * 0.95, bw * 0.55, -bh * 0.9, bw * 0.75, -bh * 0.7);
+      ctx.bezierCurveTo(bw * 0.9, -bh * 0.5, bw * 0.95, -bh * 0.2, bw * 0.92, bh * 0.05);
+      ctx.bezierCurveTo(bw * 0.95, bh * 0.25, bw * 0.88, bh * 0.45, bw * 0.7, bh * 0.55);
+      ctx.bezierCurveTo(bw * 0.5, bh * 0.65, bw * 0.3, bh * 0.6, bw * 0.15, bh * 0.5);
+      ctx.bezierCurveTo(bw * 0.1, bh * 0.4, bw * 0.06, bh * 0.2, bw * 0.04, bh * 0.0);
+      ctx.bezierCurveTo(bw * 0.04, -bh * 0.3, bw * 0.04, -bh * 0.6, bw * 0.04, -bh * 0.85);
+      ctx.closePath();
+    }
 
-    // Sulci/folds (wavy lines across each hemisphere)
-    ctx.strokeStyle = 'rgba(140, 170, 200, ' + (alpha * 0.25) + ')';
-    ctx.lineWidth = Math.max(0.5, brainW * 0.003);
-    for (let i = 0; i < 5; i++) {
-      const yOff = -bh * 0.6 + i * bh * 0.3;
-      for (let side = -1; side <= 1; side += 2) {
+    // --- Left hemisphere fill ---
+    hemispherePathLeft();
+    var leftGrad = ctx.createRadialGradient(-bw * 0.4, -bh * 0.1, 0, -bw * 0.4, -bh * 0.1, bw * 0.8);
+    leftGrad.addColorStop(0, cyanMed + (alpha * 0.18) + ')');
+    leftGrad.addColorStop(0.5, cyanDeep + (alpha * 0.1) + ')');
+    leftGrad.addColorStop(1, cyanDeep + (alpha * 0.04) + ')');
+    ctx.fillStyle = leftGrad;
+    ctx.fill();
+
+    // Left hemisphere bright edge (glowing outline)
+    hemispherePathLeft();
+    ctx.shadowColor = 'rgba(0, 220, 255, ' + (alpha * 0.5) + ')';
+    ctx.shadowBlur = 15;
+    ctx.strokeStyle = cyanBright + (alpha * 0.65) + ')';
+    ctx.lineWidth = lw * 1.5;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // --- Right hemisphere fill ---
+    hemispherePathRight();
+    var rightGrad = ctx.createRadialGradient(bw * 0.4, -bh * 0.1, 0, bw * 0.4, -bh * 0.1, bw * 0.8);
+    rightGrad.addColorStop(0, cyanMed + (alpha * 0.18) + ')');
+    rightGrad.addColorStop(0.5, cyanDeep + (alpha * 0.1) + ')');
+    rightGrad.addColorStop(1, cyanDeep + (alpha * 0.04) + ')');
+    ctx.fillStyle = rightGrad;
+    ctx.fill();
+
+    // Right hemisphere bright edge
+    hemispherePathRight();
+    ctx.shadowColor = 'rgba(0, 220, 255, ' + (alpha * 0.5) + ')';
+    ctx.shadowBlur = 15;
+    ctx.strokeStyle = cyanBright + (alpha * 0.65) + ')';
+    ctx.lineWidth = lw * 1.5;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // --- Longitudinal fissure (midline gap) ---
+    ctx.beginPath();
+    ctx.moveTo(0, -bh * 0.88);
+    ctx.bezierCurveTo(-bw * 0.01, -bh * 0.5, bw * 0.01, -bh * 0.1, 0, bh * 0.15);
+    ctx.strokeStyle = cyanBright + (alpha * 0.45) + ')';
+    ctx.lineWidth = lw * 0.8;
+    ctx.shadowColor = 'rgba(0, 220, 255, ' + (alpha * 0.3) + ')';
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // --- Sulci folds (detailed wavy grooves) ---
+    // Left hemisphere sulci
+    var sulciData = [
+      // [startX, startY, cp1x, cp1y, cp2x, cp2y, endX, endY] as fractions of bw/bh
+      // Frontal lobe horizontal folds
+      [-0.08, -0.7, -0.3, -0.75, -0.5, -0.68, -0.7, -0.65],
+      [-0.08, -0.5, -0.35, -0.56, -0.55, -0.48, -0.8, -0.42],
+      [-0.08, -0.3, -0.3, -0.36, -0.6, -0.28, -0.85, -0.18],
+      // Parietal/temporal
+      [-0.08, -0.1, -0.35, -0.16, -0.6, -0.05, -0.88, 0.05],
+      [-0.1, 0.1, -0.35, 0.06, -0.6, 0.18, -0.82, 0.25],
+      // Temporal lobe
+      [-0.15, 0.3, -0.35, 0.25, -0.55, 0.38, -0.72, 0.45],
+      // Lateral fissure (Sylvian fissure - prominent)
+      [-0.1, 0.0, -0.4, 0.05, -0.6, 0.15, -0.9, 0.12],
+    ];
+
+    for (var si = 0; si < sulciData.length; si++) {
+      var s = sulciData[si];
+      var isLateral = (si === sulciData.length - 1);
+      // Draw for both sides
+      for (var sside = -1; sside <= 1; sside += 2) {
         ctx.beginPath();
-        ctx.moveTo(side * bw * 0.1, yOff);
+        ctx.moveTo(s[0] * bw * sside, s[1] * bh);
         ctx.bezierCurveTo(
-          side * bw * 0.35, yOff - bh * 0.08,
-          side * bw * 0.55, yOff + bh * 0.08,
-          side * bw * 0.75, yOff + bh * 0.02
+          s[2] * bw * sside, s[3] * bh,
+          s[4] * bw * sside, s[5] * bh,
+          s[6] * bw * sside, s[7] * bh
         );
+        if (isLateral) {
+          // Lateral fissure is brighter/thicker
+          ctx.strokeStyle = cyanBright + (alpha * 0.4) + ')';
+          ctx.lineWidth = lw * 1.2;
+          ctx.shadowColor = 'rgba(0, 200, 255, ' + (alpha * 0.25) + ')';
+          ctx.shadowBlur = 6;
+        } else {
+          ctx.strokeStyle = cyanMed + (alpha * 0.3) + ')';
+          ctx.lineWidth = lw * 0.7;
+          ctx.shadowBlur = 0;
+        }
         ctx.stroke();
+        ctx.shadowBlur = 0;
       }
     }
+
+    // --- Central sulcus (prominent vertical-ish groove on each side) ---
+    for (var cside = -1; cside <= 1; cside += 2) {
+      ctx.beginPath();
+      ctx.moveTo(cside * bw * 0.2, -bh * 0.85);
+      ctx.bezierCurveTo(
+        cside * bw * 0.35, -bh * 0.6,
+        cside * bw * 0.45, -bh * 0.3,
+        cside * bw * 0.55, -bh * 0.05
+      );
+      ctx.strokeStyle = cyanBright + (alpha * 0.35) + ')';
+      ctx.lineWidth = lw;
+      ctx.shadowColor = 'rgba(0, 200, 255, ' + (alpha * 0.2) + ')';
+      ctx.shadowBlur = 5;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    // --- Cerebellum (lower brain) ---
+    ctx.beginPath();
+    ctx.moveTo(-bw * 0.45, bh * 0.5);
+    ctx.bezierCurveTo(-bw * 0.5, bh * 0.65, -bw * 0.35, bh * 0.85, -bw * 0.15, bh * 0.82);
+    ctx.bezierCurveTo(0, bh * 0.8, 0, bh * 0.8, bw * 0.15, bh * 0.82);
+    ctx.bezierCurveTo(bw * 0.35, bh * 0.85, bw * 0.5, bh * 0.65, bw * 0.45, bh * 0.5);
+    ctx.fillStyle = cyanDeep + (alpha * 0.12) + ')';
+    ctx.fill();
+    ctx.strokeStyle = cyanMed + (alpha * 0.45) + ')';
+    ctx.lineWidth = lw;
+    ctx.shadowColor = 'rgba(0, 200, 255, ' + (alpha * 0.3) + ')';
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Cerebellum horizontal folds (parallel lines)
+    for (var ci = 0; ci < 4; ci++) {
+      var cby = bh * 0.55 + ci * bh * 0.07;
+      var cbxSpan = bw * (0.4 - ci * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(-cbxSpan, cby);
+      ctx.bezierCurveTo(-cbxSpan * 0.6, cby - bh * 0.02, cbxSpan * 0.6, cby + bh * 0.02, cbxSpan, cby);
+      ctx.strokeStyle = cyanDim + (alpha * 0.25) + ')';
+      ctx.lineWidth = lw * 0.5;
+      ctx.stroke();
+    }
+
+    // --- Brain stem (connects downward) ---
+    ctx.beginPath();
+    ctx.moveTo(-bw * 0.08, bh * 0.55);
+    ctx.bezierCurveTo(-bw * 0.1, bh * 0.7, -bw * 0.06, bh * 0.9, 0, bh * 0.95);
+    ctx.bezierCurveTo(bw * 0.06, bh * 0.9, bw * 0.1, bh * 0.7, bw * 0.08, bh * 0.55);
+    ctx.fillStyle = cyanDeep + (alpha * 0.1) + ')';
+    ctx.fill();
+    ctx.strokeStyle = cyanMed + (alpha * 0.35) + ')';
+    ctx.lineWidth = lw * 0.8;
+    ctx.stroke();
+
+    // --- Pulsing highlight (animated bright spot) ---
+    var pulseT = Date.now() * 0.002;
+    var pulseAlpha = (Math.sin(pulseT) * 0.5 + 0.5) * alpha * 0.08;
+    var pulseGrad = ctx.createRadialGradient(0, -bh * 0.2, 0, 0, -bh * 0.2, bw * 0.5);
+    pulseGrad.addColorStop(0, 'rgba(0, 255, 255, ' + pulseAlpha + ')');
+    pulseGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = pulseGrad;
+    ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
 
     ctx.restore();
   }
