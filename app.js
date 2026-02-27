@@ -1599,8 +1599,10 @@
         const wordCenterX = faceScreenX;
         const wordCenterY = faceScreenY + skullH * 0.05;
 
-        // Font size scales with zoom so the word is large and readable
-        const fontSize = Math.max(24, faceSize * 0.18);
+        // Font size based on screen width so the whole word always fits in frame
+        // Use canvas width and word length to ensure it never overflows
+        const maxWidth = cw * 0.7; // word should fit within 70% of screen width
+        const fontSize = Math.min(cw * 0.12, maxWidth / (secretWord.length * 0.65));
 
         // Pass 1: strong glow halo behind text
         zoomCtx.save();
