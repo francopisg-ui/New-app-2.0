@@ -881,6 +881,8 @@
         const gh = cachedWordGrid.length;
         const gw = cachedWordGrid[0].length;
         cachedEdgeGrid = [];
+
+        // Compute Euclidean distance to nearest non-letter cell (including out-of-bounds)
         for (let y = 0; y < gh; y++) {
           cachedEdgeGrid[y] = [];
           for (let x = 0; x < gw; x++) {
@@ -888,20 +890,39 @@
               cachedEdgeGrid[y][x] = 0;
               continue;
             }
-            // Count how many of the 8 neighbors are also letter pixels
-            let neighbors = 0;
-            for (let dy = -1; dy <= 1; dy++) {
-              for (let dx = -1; dx <= 1; dx++) {
+            let minDist = Infinity;
+            for (let dy = -3; dy <= 3; dy++) {
+              for (let dx = -3; dx <= 3; dx++) {
                 if (dy === 0 && dx === 0) continue;
                 const ny = y + dy;
                 const nx = x + dx;
-                if (ny >= 0 && ny < gh && nx >= 0 && nx < gw && cachedWordGrid[ny][nx] === 1) {
-                  neighbors++;
+                const isLetter = (ny >= 0 && ny < gh && nx >= 0 && nx < gw) ? cachedWordGrid[ny][nx] === 1 : false;
+                if (!isLetter) {
+                  const dist = Math.sqrt(dy * dy + dx * dx);
+                  if (dist < minDist) minDist = dist;
                 }
               }
             }
-            // Interior pixels (many neighbors) get factor ~1, edge pixels get ~0.35-0.5
-            cachedEdgeGrid[y][x] = 0.35 + 0.65 * (neighbors / 8);
+            cachedEdgeGrid[y][x] = minDist === Infinity ? 1 : minDist;
+          }
+        }
+
+        // Find max distance for normalization
+        let maxDist = 0;
+        for (let y = 0; y < gh; y++) {
+          for (let x = 0; x < gw; x++) {
+            if (cachedEdgeGrid[y][x] > maxDist) maxDist = cachedEdgeGrid[y][x];
+          }
+        }
+
+        // Normalize to 0.15..1.0 range (outermost pixels very subtle, interior full)
+        if (maxDist > 0) {
+          for (let y = 0; y < gh; y++) {
+            for (let x = 0; x < gw; x++) {
+              if (cachedWordGrid[y][x] === 1) {
+                cachedEdgeGrid[y][x] = 0.15 + 0.85 * (cachedEdgeGrid[y][x] / maxDist);
+              }
+            }
           }
         }
       }
@@ -919,7 +940,7 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    const SHIFT = 40; // gentle shift for natural blending
+    const SHIFT = 35; // gentle shift for natural blending
     const gap = scale > 20 ? 1 : 0;
 
     zoomCtx.globalAlpha = opacity;
