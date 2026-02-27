@@ -1187,7 +1187,7 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    const SHIFT = 60;
+    const SHIFT = 30;
     const gap = scale > 20 ? 1 : 0;
 
     function seededRand(x, y) {
