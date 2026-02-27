@@ -941,7 +941,7 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    const SHIFT = 24; // subtle base shift
+    const SHIFT = 15; // subtle base shift
     const BLEND = 0.50; // 50/50 shifted vs original
     const DITHER = 0.95; // 95% of letter pixels get shifted
     const gap = scale > 20 ? 1 : 0;
