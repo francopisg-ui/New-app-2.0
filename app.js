@@ -37,7 +37,7 @@
   let viewerZoom = 1;
   let viewerPanX = 0;
   let viewerPanY = 0;
-  let viewerMaxZoom = 800;
+  let viewerMaxZoom = 10000;
   let viewerMinZoom = 1;
 
   // Touch tracking
