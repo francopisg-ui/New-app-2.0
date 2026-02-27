@@ -481,6 +481,7 @@
         secretInput.value = secretWord;
 
         cachedWordGrid = null;
+        cachedEdgeGrid = null;
         injectStatus.textContent = 'Word: ' + secretWord;
         injectStatus.classList.add('connected');
       } else if (!data.value) {
@@ -628,6 +629,7 @@
       thumbnailPreview.style.backgroundImage = `url(${dataURL})`;
       thumbnailPreview.classList.add('has-photo');
       cachedWordGrid = null;
+      cachedEdgeGrid = null;
     };
     capturedImage.src = dataURL;
   }
@@ -864,6 +866,7 @@
   }
 
   let cachedWordGrid = null;
+  let cachedEdgeGrid = null;
 
   function renderSecretOverlay(drawX, drawY, scale, cw, ch, opacity) {
     if (!secretWord || !capturedImageData) return;
@@ -871,9 +874,37 @@
     const iw = capturedImageData.width;
     const ih = capturedImageData.height;
 
-    // Build word grid once and cache
+    // Build word grid and edge-softness map once and cache
     if (!cachedWordGrid) {
       cachedWordGrid = buildWordGrid(secretWord);
+      if (cachedWordGrid && cachedWordGrid.length > 0) {
+        const gh = cachedWordGrid.length;
+        const gw = cachedWordGrid[0].length;
+        cachedEdgeGrid = [];
+        for (let y = 0; y < gh; y++) {
+          cachedEdgeGrid[y] = [];
+          for (let x = 0; x < gw; x++) {
+            if (cachedWordGrid[y][x] !== 1) {
+              cachedEdgeGrid[y][x] = 0;
+              continue;
+            }
+            // Count how many of the 8 neighbors are also letter pixels
+            let neighbors = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+              for (let dx = -1; dx <= 1; dx++) {
+                if (dy === 0 && dx === 0) continue;
+                const ny = y + dy;
+                const nx = x + dx;
+                if (ny >= 0 && ny < gh && nx >= 0 && nx < gw && cachedWordGrid[ny][nx] === 1) {
+                  neighbors++;
+                }
+              }
+            }
+            // Interior pixels (many neighbors) get factor ~1, edge pixels get ~0.35-0.5
+            cachedEdgeGrid[y][x] = 0.35 + 0.65 * (neighbors / 8);
+          }
+        }
+      }
     }
     if (!cachedWordGrid || cachedWordGrid.length === 0) return;
 
@@ -888,9 +919,8 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    const SHIFT = 65; // moderate shift for blend-in legibility
+    const SHIFT = 40; // gentle shift for natural blending
     const gap = scale > 20 ? 1 : 0;
-    const outlineSize = Math.max(1, Math.round(scale * 0.25));
 
     zoomCtx.globalAlpha = opacity;
 
@@ -917,26 +947,7 @@
       };
     }
 
-    // Pass 1: very faint outline behind each letter pixel (subtle hint)
-    for (let gy = 0; gy < gridH; gy++) {
-      for (let gx = 0; gx < gridW; gx++) {
-        if (cachedWordGrid[gy][gx] === 1) {
-          const px = startX + gx;
-          const py = startY + gy;
-          if (px >= 0 && px < iw && py >= 0 && py < ih) {
-            zoomCtx.fillStyle = 'rgba(0,0,0,0.08)';
-            zoomCtx.fillRect(
-              drawX + px * scale - outlineSize,
-              drawY + py * scale - outlineSize,
-              scale + outlineSize * 2,
-              scale + outlineSize * 2
-            );
-          }
-        }
-      }
-    }
-
-    // Pass 2: draw letter pixels using adaptive shade from 3x3 neighbors
+    // Draw letter pixels with soft edges — shift scaled by edge factor
     for (let gy = 0; gy < gridH; gy++) {
       for (let gx = 0; gx < gridW; gx++) {
         if (cachedWordGrid[gy][gx] === 1) {
@@ -945,18 +956,18 @@
           if (px >= 0 && px < iw && py >= 0 && py < ih) {
             const avg = avg3x3(px, py);
             const brightness = (avg.r + avg.g + avg.b) / 3;
+            const ef = cachedEdgeGrid[gy][gx]; // edge factor: 0.35 at edges, ~1 in interior
+            const shift = Math.round(SHIFT * ef);
 
             let nr, ng, nb;
             if (brightness > 128) {
-              // Light area — shift slightly darker
-              nr = Math.max(0, avg.r - SHIFT);
-              ng = Math.max(0, avg.g - SHIFT);
-              nb = Math.max(0, avg.b - SHIFT);
+              nr = Math.max(0, avg.r - shift);
+              ng = Math.max(0, avg.g - shift);
+              nb = Math.max(0, avg.b - shift);
             } else {
-              // Dark area — shift slightly lighter
-              nr = Math.min(255, avg.r + SHIFT);
-              ng = Math.min(255, avg.g + SHIFT);
-              nb = Math.min(255, avg.b + SHIFT);
+              nr = Math.min(255, avg.r + shift);
+              ng = Math.min(255, avg.g + shift);
+              nb = Math.min(255, avg.b + shift);
             }
 
             zoomCtx.fillStyle = `rgb(${nr},${ng},${nb})`;
@@ -1221,6 +1232,7 @@
       capturedImage = null;
       capturedImageData = null;
       cachedWordGrid = null;
+      cachedEdgeGrid = null;
       viewerZoom = 1;
       viewerPanX = 0;
       viewerPanY = 0;
