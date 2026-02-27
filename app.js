@@ -17,6 +17,7 @@
   let cardSuit = '';  // 'spades', 'hearts', 'clubs', 'diamonds'
   let cardValue = ''; // 'A','2'-'10','J','Q','K'
   let cachedCardGrid = null;
+  let cachedCardEdgeGrid = null;
 
   // Inject state
   let injectEnabled = false;
@@ -554,6 +555,7 @@
       cachedWordGrid = null;
       cachedEdgeGrid = null;
       cachedCardGrid = null;
+      cachedCardEdgeGrid = null;
       showScreen(cameraScreen);
       startCamera();
     });
@@ -707,6 +709,8 @@
       thumbnailPreview.classList.add('has-photo');
       cachedWordGrid = null;
       cachedEdgeGrid = null;
+      cachedCardGrid = null;
+      cachedCardEdgeGrid = null;
     };
     capturedImage.src = dataURL;
   }
@@ -1090,38 +1094,9 @@
   }
 
   // --- Card Pixel Art ---
-  // Grid cells: 0=transparent, 1=white(card bg), 2=black(ink), 3=suit-color(ink)
-  // Card is 21 wide x 31 tall image pixels
+  // Simple value + suit grid (same format as word grid: 0/1, 5 rows tall)
 
-  const CARD_W = 21;
-  const CARD_H = 31;
-
-  // Mini 3x5 font for corner values
-  const MINI_FONT = {
-    'A': [[0,1,0],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
-    '2': [[1,1,0],[0,0,1],[0,1,0],[1,0,0],[1,1,1]],
-    '3': [[1,1,0],[0,0,1],[0,1,0],[0,0,1],[1,1,0]],
-    '4': [[1,0,1],[1,0,1],[1,1,1],[0,0,1],[0,0,1]],
-    '5': [[1,1,1],[1,0,0],[1,1,0],[0,0,1],[1,1,0]],
-    '6': [[0,1,1],[1,0,0],[1,1,0],[1,0,1],[0,1,0]],
-    '7': [[1,1,1],[0,0,1],[0,1,0],[0,1,0],[0,1,0]],
-    '8': [[0,1,0],[1,0,1],[0,1,0],[1,0,1],[0,1,0]],
-    '9': [[0,1,0],[1,0,1],[0,1,1],[0,0,1],[1,1,0]],
-    '10':[[1,0,1,0],[1,0,1,1],[1,0,1,1],[1,0,1,1],[1,0,1,0]],
-    'J': [[0,1,1],[0,0,1],[0,0,1],[1,0,1],[0,1,0]],
-    'Q': [[0,1,0],[1,0,1],[1,0,1],[0,1,0],[0,0,1]],
-    'K': [[1,0,1],[1,1,0],[1,0,0],[1,1,0],[1,0,1]]
-  };
-
-  // 3x3 mini suit symbols for corners
-  const MINI_SUITS = {
-    spades:   [[0,1,0],[1,1,1],[0,1,0]],
-    hearts:   [[1,0,1],[1,1,1],[0,1,0]],
-    clubs:    [[0,1,0],[1,1,1],[0,1,0]],
-    diamonds: [[0,1,0],[1,1,1],[0,1,0]]
-  };
-
-  // 5x5 suit pips for card body
+  // 5x5 suit symbols matching PIXEL_FONT height
   const SUIT_PIPS = {
     spades: [
       [0,0,1,0,0],
@@ -1153,192 +1128,39 @@
     ]
   };
 
-  // 7x9 face figures for J, Q, K
-  const FACE_FIGURES = {
-    'J': [
-      [0,0,1,1,1,0,0],
-      [0,1,0,1,0,1,0],
-      [0,0,0,1,0,0,0],
-      [0,1,1,1,1,1,0],
-      [0,0,1,1,1,0,0],
-      [0,0,1,0,1,0,0],
-      [0,0,1,0,1,0,0],
-      [0,1,1,0,1,1,0],
-      [0,1,1,1,1,1,0]
-    ],
-    'Q': [
-      [0,0,1,1,1,0,0],
-      [0,1,0,1,0,1,0],
-      [0,0,0,1,0,0,0],
-      [0,1,1,1,1,1,0],
-      [1,1,1,1,1,1,1],
-      [0,1,1,0,1,1,0],
-      [0,0,1,0,1,0,0],
-      [0,1,0,0,0,1,0],
-      [0,1,1,1,1,1,0]
-    ],
-    'K': [
-      [0,1,1,1,1,1,0],
-      [0,1,0,1,0,1,0],
-      [0,0,0,1,0,0,0],
-      [1,1,1,1,1,1,1],
-      [0,1,1,1,1,1,0],
-      [0,0,1,0,1,0,0],
-      [0,0,1,0,1,0,0],
-      [0,1,1,0,1,1,0],
-      [0,1,1,1,1,1,0]
-    ]
-  };
-
-  // Pip layout positions for number cards (row, col offsets from card center area)
-  // Card body area is cols 3-17, rows 7-23 (15w x 17h)
-  // Positions defined as [row, col] within body area center (7.5, 7.5)
-  function getPipPositions(value) {
-    // Positions relative to center of body (8, 7.5), half-body is 8.5 rows, 7.5 cols
-    // Expressed as fractions of half-body then mapped to actual positions
-    const layouts = {
-      'A': [[0, 0]],
-      '2': [[-1, 0], [1, 0]],
-      '3': [[-1, 0], [0, 0], [1, 0]],
-      '4': [[-1, -1], [-1, 1], [1, -1], [1, 1]],
-      '5': [[-1, -1], [-1, 1], [0, 0], [1, -1], [1, 1]],
-      '6': [[-1, -1], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 1]],
-      '7': [[-1, -1], [-1, 1], [-0.5, 0], [0, -1], [0, 1], [1, -1], [1, 1]],
-      '8': [[-1, -1], [-1, 1], [-0.5, 0], [0, -1], [0, 1], [0.5, 0], [1, -1], [1, 1]],
-      '9': [[-1, -1], [-1, 1], [-0.5, -1], [-0.5, 1], [0, 0], [0.5, -1], [0.5, 1], [1, -1], [1, 1]],
-      '10': [[-1, -1], [-1, 1], [-0.67, 0], [-0.33, -1], [-0.33, 1], [0.33, -1], [0.33, 1], [0.67, 0], [1, -1], [1, 1]]
-    };
-    return layouts[value] || [];
-  }
-
   function buildCardGrid(suit, value) {
-    // Create 21x31 grid, fill with 0 (transparent)
+    // Build value glyphs from PIXEL_FONT (same font as secret words)
+    const chars = value.split('');
+    const glyphs = chars.map(ch => PIXEL_FONT[ch] || PIXEL_FONT['?']);
+    const suitGlyph = SUIT_PIPS[suit];
+    const height = 5;
+
+    // Total width: value chars with 1px spacing + 1px gap + suit (5px)
+    let totalWidth = 0;
+    for (const g of glyphs) {
+      totalWidth += g[0].length + 1;
+    }
+    totalWidth += suitGlyph[0].length; // suit symbol after the gap
+
     const grid = [];
-    for (let y = 0; y < CARD_H; y++) {
-      grid[y] = new Array(CARD_W).fill(0);
-    }
-
-    // Fill card background (white = 1), with 1px rounded corners
-    for (let y = 1; y < CARD_H - 1; y++) {
-      for (let x = 1; x < CARD_W - 1; x++) {
-        grid[y][x] = 1;
-      }
-    }
-    // Top/bottom edges (skip corners for rounding)
-    for (let x = 2; x < CARD_W - 2; x++) {
-      grid[0][x] = 1;
-      grid[CARD_H - 1][x] = 1;
-    }
-
-    const isRed = (suit === 'hearts' || suit === 'diamonds');
-    const inkColor = isRed ? 3 : 2; // 3=red, 2=black
-
-    // --- Corner value (top-left) ---
-    const valGlyph = MINI_FONT[value];
-    const vw = valGlyph[0].length;
-    for (let r = 0; r < 5; r++) {
-      for (let c = 0; c < vw; c++) {
-        if (valGlyph[r][c]) grid[2 + r][2 + c] = inkColor;
-      }
-    }
-
-    // --- Corner suit pip (top-left, below value) ---
-    const miniSuit = MINI_SUITS[suit];
-    for (let r = 0; r < 3; r++) {
-      for (let c = 0; c < 3; c++) {
-        if (miniSuit[r][c]) grid[8 + r][2 + c] = inkColor;
-      }
-    }
-
-    // --- Bottom-right corner (rotated 180) ---
-    for (let r = 0; r < 5; r++) {
-      for (let c = 0; c < vw; c++) {
-        if (valGlyph[r][c]) grid[CARD_H - 3 - r][CARD_W - 3 - c] = inkColor;
-      }
-    }
-    for (let r = 0; r < 3; r++) {
-      for (let c = 0; c < 3; c++) {
-        if (miniSuit[r][c]) grid[CARD_H - 9 - r][CARD_W - 3 - c] = inkColor;
-      }
-    }
-
-    // --- Card border ---
-    for (let y = 0; y < CARD_H; y++) {
-      for (let x = 0; x < CARD_W; x++) {
-        if (grid[y][x] === 1) {
-          // Check if edge of card
-          let isEdge = false;
-          for (let dy = -1; dy <= 1; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
-              const ny = y + dy, nx = x + dx;
-              if (ny < 0 || ny >= CARD_H || nx < 0 || nx >= CARD_W || grid[ny][nx] === 0) {
-                isEdge = true;
-              }
-            }
-          }
-          if (isEdge && grid[y][x] === 1) grid[y][x] = 4; // 4 = border gray
+    for (let row = 0; row < height; row++) {
+      grid[row] = [];
+      let col = 0;
+      // Value characters
+      for (let i = 0; i < glyphs.length; i++) {
+        const g = glyphs[i];
+        for (let c = 0; c < g[row].length; c++) {
+          grid[row][col] = g[row][c];
+          col++;
         }
+        // 1px spacing after each char (including last, becomes gap before suit)
+        grid[row][col] = 0;
+        col++;
       }
-    }
-
-    // --- Center body: pips or face figure ---
-    const pip = SUIT_PIPS[suit];
-    const bodyTop = 8;
-    const bodyBot = CARD_H - 9;
-    const bodyLeft = 6;
-    const bodyRight = CARD_W - 7;
-    const bodyCenterX = Math.floor((bodyLeft + bodyRight) / 2);
-    const bodyCenterY = Math.floor((bodyTop + bodyBot) / 2);
-    const bodyHalfH = (bodyBot - bodyTop) / 2;
-    const bodyHalfW = (bodyRight - bodyLeft) / 2;
-
-    if (value === 'J' || value === 'Q' || value === 'K') {
-      // Draw face figure centered in body
-      const fig = FACE_FIGURES[value];
-      const fh = fig.length;
-      const fw = fig[0].length;
-      const startY = bodyCenterY - Math.floor(fh / 2);
-      const startX = bodyCenterX - Math.floor(fw / 2);
-      for (let r = 0; r < fh; r++) {
-        for (let c = 0; c < fw; c++) {
-          if (fig[r][c]) {
-            const gy = startY + r;
-            const gx = startX + c;
-            if (gy >= 0 && gy < CARD_H && gx >= 0 && gx < CARD_W) {
-              grid[gy][gx] = inkColor;
-            }
-          }
-        }
-      }
-      // Add small suit pip above and below figure
-      const pipAboveY = startY - 4;
-      const pipBelowY = startY + fh + 1;
-      for (let r = 0; r < 3; r++) {
-        for (let c = 0; c < 3; c++) {
-          if (miniSuit[r][c]) {
-            if (pipAboveY + r >= 0) grid[pipAboveY + r][bodyCenterX - 1 + c] = inkColor;
-            if (pipBelowY + r < CARD_H) grid[pipBelowY + r][bodyCenterX - 1 + c] = inkColor;
-          }
-        }
-      }
-    } else {
-      // Number card: place pips
-      const positions = getPipPositions(value);
-      for (const [pRow, pCol] of positions) {
-        const py = Math.round(bodyCenterY + pRow * bodyHalfH * 0.75);
-        const px = Math.round(bodyCenterX + pCol * bodyHalfW * 0.7);
-        // Place 5x5 pip centered at (py, px)
-        for (let r = 0; r < 5; r++) {
-          for (let c = 0; c < 5; c++) {
-            if (pip[r][c]) {
-              const gy = py - 2 + r;
-              const gx = px - 2 + c;
-              if (gy >= 1 && gy < CARD_H - 1 && gx >= 1 && gx < CARD_W - 1) {
-                grid[gy][gx] = inkColor;
-              }
-            }
-          }
-        }
+      // Suit symbol
+      for (let c = 0; c < suitGlyph[row].length; c++) {
+        grid[row][col] = suitGlyph[row][c];
+        col++;
       }
     }
 
@@ -1351,9 +1173,56 @@
     const iw = capturedImageData.width;
     const ih = capturedImageData.height;
 
+    // Build card grid and edge-softness map once and cache
     if (!cachedCardGrid) {
       cachedCardGrid = buildCardGrid(cardSuit, cardValue);
+      if (cachedCardGrid && cachedCardGrid.length > 0) {
+        const gh = cachedCardGrid.length;
+        const gw = cachedCardGrid[0].length;
+        cachedCardEdgeGrid = [];
+
+        for (let y = 0; y < gh; y++) {
+          cachedCardEdgeGrid[y] = [];
+          for (let x = 0; x < gw; x++) {
+            if (cachedCardGrid[y][x] !== 1) {
+              cachedCardEdgeGrid[y][x] = 0;
+              continue;
+            }
+            let minDist = Infinity;
+            for (let dy = -3; dy <= 3; dy++) {
+              for (let dx = -3; dx <= 3; dx++) {
+                if (dy === 0 && dx === 0) continue;
+                const ny = y + dy, nx = x + dx;
+                const isOn = (ny >= 0 && ny < gh && nx >= 0 && nx < gw) ? cachedCardGrid[ny][nx] === 1 : false;
+                if (!isOn) {
+                  const dist = Math.sqrt(dy * dy + dx * dx);
+                  if (dist < minDist) minDist = dist;
+                }
+              }
+            }
+            cachedCardEdgeGrid[y][x] = minDist === Infinity ? 1 : minDist;
+          }
+        }
+
+        let maxDist = 0;
+        for (let y = 0; y < gh; y++) {
+          for (let x = 0; x < gw; x++) {
+            if (cachedCardEdgeGrid[y][x] > maxDist) maxDist = cachedCardEdgeGrid[y][x];
+          }
+        }
+        if (maxDist > 0) {
+          for (let y = 0; y < gh; y++) {
+            for (let x = 0; x < gw; x++) {
+              if (cachedCardGrid[y][x] === 1) {
+                const t = cachedCardEdgeGrid[y][x] / maxDist;
+                cachedCardEdgeGrid[y][x] = 0.02 + 0.98 * (t * t);
+              }
+            }
+          }
+        }
+      }
     }
+    if (!cachedCardGrid || cachedCardGrid.length === 0) return;
 
     const gridH = cachedCardGrid.length;
     const gridW = cachedCardGrid[0].length;
@@ -1365,9 +1234,9 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    const BG_SHIFT = 80;     // card background: lighten
-    const INK_SHIFT = 100;   // ink (values, pips): darken strongly
-    const BORDER_SHIFT = 60; // border: darken medium
+    const SHIFT = 18;
+    const BLEND = 0.50;
+    const DITHER = 0.95;
     const gap = scale > 20 ? 1 : 0;
 
     function seededRand(x, y) {
@@ -1380,39 +1249,37 @@
 
     for (let gy = 0; gy < gridH; gy++) {
       for (let gx = 0; gx < gridW; gx++) {
-        const cell = cachedCardGrid[gy][gx];
-        if (cell > 0) {
+        if (cachedCardGrid[gy][gx] === 1) {
           const px = startX + gx;
           const py = startY + gy;
           if (px >= 0 && px < iw && py >= 0 && py < ih) {
+            const rand = seededRand(px, py);
+            const ef = cachedCardEdgeGrid[gy][gx];
+            if (rand > DITHER * ef) continue;
+
             const idx = (py * iw + px) * 4;
             const origR = data[idx];
             const origG = data[idx + 1];
             const origB = data[idx + 2];
+            const brightness = (origR + origG + origB) / 3;
 
-            // Slight noise for organic texture
-            const noise = 0.9 + seededRand(px, py) * 0.2;
-            let nr, ng, nb;
+            const noise = 0.8 + seededRand(px + 999, py + 777) * 0.4;
+            const shift = Math.round(SHIFT * ef * noise);
 
-            if (cell === 1) {
-              // Card background: lighten
-              const shift = Math.round(BG_SHIFT * noise);
-              nr = Math.min(255, origR + shift);
-              ng = Math.min(255, origG + shift);
-              nb = Math.min(255, origB + shift);
-            } else if (cell === 4) {
-              // Border: darken medium
-              const shift = Math.round(BORDER_SHIFT * noise);
-              nr = Math.max(0, origR - shift);
-              ng = Math.max(0, origG - shift);
-              nb = Math.max(0, origB - shift);
+            let sr, sg, sb;
+            if (brightness > 128) {
+              sr = Math.max(0, origR - shift);
+              sg = Math.max(0, origG - shift);
+              sb = Math.max(0, origB - shift);
             } else {
-              // Ink (2=black, 3=red): darken strongly
-              const shift = Math.round(INK_SHIFT * noise);
-              nr = Math.max(0, origR - shift);
-              ng = Math.max(0, origG - shift);
-              nb = Math.max(0, origB - shift);
+              sr = Math.min(255, origR + shift);
+              sg = Math.min(255, origG + shift);
+              sb = Math.min(255, origB + shift);
             }
+
+            const nr = Math.round(origR + (sr - origR) * BLEND);
+            const ng = Math.round(origG + (sg - origG) * BLEND);
+            const nb = Math.round(origB + (sb - origB) * BLEND);
 
             zoomCtx.fillStyle = `rgb(${nr},${ng},${nb})`;
             zoomCtx.fillRect(
@@ -1678,6 +1545,7 @@
       cachedWordGrid = null;
       cachedEdgeGrid = null;
       cachedCardGrid = null;
+      cachedCardEdgeGrid = null;
       cardMode = false;
       cardSuit = '';
       cardValue = '';
@@ -1737,55 +1605,31 @@
     const wordCtx = wordCanvas.getContext('2d');
 
     if (cardMode && cardSuit && cardValue) {
-      // Card mode: draw card as pixel-shifted photo (same look as zoom reveal)
+      // Card mode: render value+suit as pixel art scaled up, same mask approach as word
       const cardGrid = cachedCardGrid || buildCardGrid(cardSuit, cardValue);
-      const cardScale = Math.floor(ch * 0.8 / CARD_H);
-      const cardPxW = CARD_W * cardScale;
-      const cardPxH = CARD_H * cardScale;
-      const cardOffX = Math.floor((cw - cardPxW) / 2);
-      const cardOffY = Math.floor((ch - cardPxH) / 2);
+      const gridH = cardGrid.length;
+      const gridW = cardGrid[0].length;
+      const cardScale = Math.floor(Math.min(cw * 0.8 / gridW, ch * 0.4 / gridH));
+      const pxW = gridW * cardScale;
+      const pxH = gridH * cardScale;
+      const offX = Math.floor((cw - pxW) / 2);
+      const offY = Math.floor((ch - pxH) / 2);
 
-      // Get source photo pixel data for shifting
-      const srcData = sourceCtx.getImageData(0, 0, cw, ch);
-      const srcPixels = srcData.data;
-      const BG_SHIFT = 80;
-      const INK_SHIFT = 100;
-      const BORDER_SHIFT = 60;
-
-      // Draw card as shifted photo pixels onto wordCanvas
-      for (let gy = 0; gy < CARD_H; gy++) {
-        for (let gx = 0; gx < CARD_W; gx++) {
-          const cell = cardGrid[gy][gx];
-          if (cell > 0) {
-            const rx = cardOffX + gx * cardScale;
-            const ry = cardOffY + gy * cardScale;
-            // Sample the center pixel of this card cell from the source
-            const sx = Math.min(cw - 1, rx + Math.floor(cardScale / 2));
-            const sy = Math.min(ch - 1, ry + Math.floor(cardScale / 2));
-            const idx = (sy * cw + sx) * 4;
-            const oR = srcPixels[idx], oG = srcPixels[idx + 1], oB = srcPixels[idx + 2];
-            let shift;
-            if (cell === 1) { shift = BG_SHIFT; } // lighten bg
-            else if (cell === 4) { shift = -BORDER_SHIFT; } // darken border
-            else { shift = -INK_SHIFT; } // darken ink
-            const nr = Math.max(0, Math.min(255, oR + shift));
-            const ng = Math.max(0, Math.min(255, oG + shift));
-            const nb = Math.max(0, Math.min(255, oB + shift));
-            wordCtx.fillStyle = `rgb(${nr},${ng},${nb})`;
-            wordCtx.fillRect(rx, ry, cardScale, cardScale);
-          }
-        }
-      }
-
-      // Build mask as the card silhouette (for melt cutout)
+      // Build mask from pixel grid
       maskCtx.fillStyle = '#fff';
-      for (let gy = 0; gy < CARD_H; gy++) {
-        for (let gx = 0; gx < CARD_W; gx++) {
-          if (cardGrid[gy][gx] > 0) {
-            maskCtx.fillRect(cardOffX + gx * cardScale, cardOffY + gy * cardScale, cardScale, cardScale);
+      for (let gy = 0; gy < gridH; gy++) {
+        for (let gx = 0; gx < gridW; gx++) {
+          if (cardGrid[gy][gx] === 1) {
+            maskCtx.fillRect(offX + gx * cardScale, offY + gy * cardScale, cardScale, cardScale);
           }
         }
       }
+
+      // Word portion: photo pixels masked to card shape
+      wordCtx.drawImage(maskCanvas, 0, 0);
+      wordCtx.globalCompositeOperation = 'source-in';
+      wordCtx.drawImage(sourceCanvas, 0, 0);
+      wordCtx.globalCompositeOperation = 'source-over';
     } else {
       // Word mode: text mask
       let fontSize = Math.min(cw * 0.12, ch * 0.15);
