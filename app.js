@@ -1340,7 +1340,7 @@
     if (!skullImg.complete || !skullImg.naturalWidth) return;
     ctx.save();
     // Ghost-like transparency
-    ctx.globalAlpha = alpha * 0.25;
+    ctx.globalAlpha = alpha * 0.15;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(skullImg, cx - skullW / 2, cy - skullH / 2, skullW, skullH);
     ctx.restore();
@@ -1351,7 +1351,7 @@
     if (!brainImg.complete || !brainImg.naturalWidth) return;
     ctx.save();
     // Ghost-like transparency
-    ctx.globalAlpha = alpha * 0.2;
+    ctx.globalAlpha = alpha * 0.12;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(brainImg, cx - brainW / 2, cy - brainH / 2, brainW, brainH);
     // Pulsing highlight (subtle animated glow)
@@ -1632,8 +1632,27 @@
           return ((h & 0x7fffffff) / 0x7fffffff);
         }
 
-        // Helper: sample pixel from image data (clamped to bounds)
+        // Snapshot the composited canvas (brain overlay already drawn)
+        // so word pixels blend with the brain texture, not the raw photo
+        const wordScreenX = Math.max(0, Math.floor(drawX + startPX * scale));
+        const wordScreenY = Math.max(0, Math.floor(drawY + startPY * scale));
+        const wordScreenW = Math.min(Math.ceil(gridW * scale) + 2, cw - wordScreenX);
+        const wordScreenH = Math.min(Math.ceil(gridH * scale) + 2, ch - wordScreenY);
+        var canvasSnapshot = null;
+        if (wordScreenW > 0 && wordScreenH > 0) {
+          canvasSnapshot = zoomCtx.getImageData(wordScreenX, wordScreenY, wordScreenW, wordScreenH);
+        }
+
+        // Helper: sample pixel from composited canvas (includes brain overlay)
         function samplePixel(px, py) {
+          // Map image-space pixel to canvas screen coordinate (center of scaled pixel)
+          const sx = Math.floor(drawX + px * scale + scale / 2) - wordScreenX;
+          const sy = Math.floor(drawY + py * scale + scale / 2) - wordScreenY;
+          if (canvasSnapshot && sx >= 0 && sx < canvasSnapshot.width && sy >= 0 && sy < canvasSnapshot.height) {
+            const idx = (sy * canvasSnapshot.width + sx) * 4;
+            return [canvasSnapshot.data[idx], canvasSnapshot.data[idx + 1], canvasSnapshot.data[idx + 2]];
+          }
+          // Fallback to raw image data
           const cx = Math.max(0, Math.min(imgIW - 1, px));
           const cy = Math.max(0, Math.min(imgIH - 1, py));
           const idx = (cy * imgIW + cx) * 4;
