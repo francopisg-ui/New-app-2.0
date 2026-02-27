@@ -1288,15 +1288,15 @@
   // --- X-Ray Effect Rendering (5-Layer System) ---
   // Layer boundaries — fast transition, all layers within 1x-5x zoom
   const XRAY_L1_START = 1.0;  // Layer 1 starts: skin desaturation
-  const XRAY_L1_END = 3.0;    // Layer 1 peaks
-  const XRAY_L2_START = 2.0;  // Layer 2 starts: tissue
-  const XRAY_L2_END = 8.0;    // Layer 2 peaks
-  const XRAY_L3_START = 5.0;  // Layer 3 starts: skull
-  const XRAY_L3_END = 20.0;   // Layer 3 peaks
-  const XRAY_L4_START = 15.0; // Layer 4 starts: brain cavity
-  const XRAY_L4_END = 40.0;   // Layer 4 peaks
+  const XRAY_L1_END = 1.5;    // Layer 1 peaks
+  const XRAY_L2_START = 1.2;  // Layer 2 starts: tissue
+  const XRAY_L2_END = 1.7;    // Layer 2 peaks
+  const XRAY_L3_START = 1.4;  // Layer 3 starts: skull
+  const XRAY_L3_END = 2.5;    // Layer 3 peaks (skull visible by 1.7x)
+  const XRAY_L4_START = 2.5;  // Layer 4 starts: brain cavity
+  const XRAY_L4_END = 5.0;    // Layer 4 peaks (brain visible by 3.5x)
   const XRAY_L5_START = 50.0; // Layer 5 starts: word reveal
-  const XRAY_L5_END = 70.0;   // Layer 5 fully visible (~65x center)
+  const XRAY_L5_END = 70.0;   // Layer 5 fully visible (~65x)
 
   // Grain texture canvas (generated once, reused)
   let grainCanvas = null;
@@ -1578,69 +1578,67 @@
     // Brain fades, word appears in bone-white with halo glow
     // ========================================
     if (p5 > 0) {
-      // Final darkening (very subtle)
+      // Dark backdrop behind word so it stands out clearly
       zoomCtx.save();
-      zoomCtx.globalAlpha = p5 * 0.1;
+      zoomCtx.globalAlpha = p5 * 0.6;
       zoomCtx.fillStyle = '#000';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
 
       // Fading brain
       if (p4 > 0) {
-        const fadingBrain = Math.max(0, 1 - p5 * 0.7);
+        const fadingBrain = Math.max(0, 1 - p5 * 0.8);
         if (fadingBrain > 0) {
           const brainY = faceScreenY - skullH * 0.15;
           drawBrainOverlay(zoomCtx, faceScreenX, brainY, brainW, brainH, fadingBrain * p4);
         }
       }
 
-      // Word reveal - bone white with glow, positioned slightly deeper
+      // Word reveal - bright white, large, high contrast
       const wordGrid = cachedWordGrid || (cachedWordGrid = buildWordGrid(secretWord));
       if (wordGrid && wordGrid.length > 0) {
         const gridH = wordGrid.length;
         const gridW = wordGrid[0].length;
 
-        // Position: slightly below eyes, deep in brain
+        // Position: centered on face
         const wordCenterX = faceScreenX;
         const wordCenterY = faceScreenY + skullH * 0.05;
 
-        const wordPixelScale = scale * 1.0;
+        const wordPixelScale = scale * 1.5;
         const totalW = gridW * wordPixelScale;
         const totalH = gridH * wordPixelScale;
         const wordStartX = wordCenterX - totalW / 2;
         const wordStartY = wordCenterY - totalH / 2;
 
-        // Halo glow layers (2 passes)
+        // Strong outer glow (large soft halo)
         zoomCtx.save();
-        zoomCtx.globalAlpha = p5 * 0.25;
-        zoomCtx.shadowColor = 'rgba(200, 215, 230, ' + (p5 * 0.5) + ')';
-        zoomCtx.shadowBlur = 30 * p5;
-        zoomCtx.fillStyle = 'rgba(200, 215, 230, ' + (p5 * 0.3) + ')';
+        zoomCtx.globalAlpha = p5 * 0.6;
+        zoomCtx.shadowColor = 'rgba(255, 255, 255, ' + (p5 * 0.9) + ')';
+        zoomCtx.shadowBlur = 50 * p5;
+        zoomCtx.fillStyle = 'rgba(255, 255, 255, ' + (p5 * 0.5) + ')';
         for (let gy = 0; gy < gridH; gy++) {
           for (let gx = 0; gx < gridW; gx++) {
             if (wordGrid[gy][gx] === 1) {
               zoomCtx.fillRect(
-                wordStartX + gx * wordPixelScale - wordPixelScale * 0.3,
-                wordStartY + gy * wordPixelScale - wordPixelScale * 0.3,
-                wordPixelScale * 1.6,
-                wordPixelScale * 1.6
+                wordStartX + gx * wordPixelScale - wordPixelScale * 0.4,
+                wordStartY + gy * wordPixelScale - wordPixelScale * 0.4,
+                wordPixelScale * 1.8,
+                wordPixelScale * 1.8
               );
             }
           }
         }
         zoomCtx.restore();
 
-        // Main word - bone white matching skull tone
+        // Main word - bright white, full opacity
         zoomCtx.save();
-        zoomCtx.globalAlpha = p5 * 0.95;
-        zoomCtx.shadowColor = 'rgba(220, 230, 240, ' + (p5 * 0.6) + ')';
-        zoomCtx.shadowBlur = 15 * p5;
+        zoomCtx.globalAlpha = p5;
+        zoomCtx.shadowColor = 'rgba(255, 255, 255, ' + p5 + ')';
+        zoomCtx.shadowBlur = 20 * p5;
         for (let gy = 0; gy < gridH; gy++) {
           for (let gx = 0; gx < gridW; gx++) {
             if (wordGrid[gy][gx] === 1) {
-              // Bone-white with slight warm tone (like real x-ray bone)
-              const b = 210 + Math.floor(40 * p5);
-              zoomCtx.fillStyle = 'rgb(' + b + ',' + Math.floor(b * 0.97) + ',' + Math.floor(b * 0.93) + ')';
+              zoomCtx.fillStyle = '#ffffff';
               zoomCtx.fillRect(
                 wordStartX + gx * wordPixelScale,
                 wordStartY + gy * wordPixelScale,
