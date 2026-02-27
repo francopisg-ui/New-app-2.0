@@ -1401,12 +1401,12 @@
     const faceScreenX = drawX + facePosX * scale;
     const faceScreenY = drawY + facePosY * scale;
 
-    // Skull/brain size scales with zoom (based on approximate face size)
+    // Skull/brain size scales with zoom (sized to match the face guide circle ~220x300)
     const faceSize = Math.min(iw, ih) * 0.5 * scale;
-    const skullW = faceSize * 0.7;
-    const skullH = faceSize * 0.9;
-    const brainW = faceSize * 0.55;
-    const brainH = faceSize * 0.45;
+    const skullW = faceSize * 1.0;
+    const skullH = faceSize * 1.35;
+    const brainW = faceSize * 0.8;
+    const brainH = faceSize * 0.65;
 
     // Layer progress values (0-1 each)
     const p1 = layerProgress(viewerZoom, XRAY_L1_START, XRAY_L1_END); // skin desat
