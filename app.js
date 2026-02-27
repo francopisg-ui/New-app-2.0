@@ -415,9 +415,28 @@
   });
 
   // --- Inject Integration ---
+
+  // Restore saved inject state from localStorage
+  (function restoreInjectState() {
+    const savedEnabled = localStorage.getItem('injectEnabled');
+    const savedId = localStorage.getItem('injectId');
+    if (savedEnabled === 'true') {
+      injectEnabled = true;
+      injectToggle.classList.add('active');
+      injectIdInput.classList.remove('hidden');
+      injectStatus.classList.remove('hidden');
+      secretInput.classList.add('hidden');
+      if (savedId) {
+        injectIdInput.value = savedId;
+        startInjectPolling(savedId);
+      }
+    }
+  })();
+
   injectToggle.addEventListener('click', () => {
     injectEnabled = !injectEnabled;
     injectToggle.classList.toggle('active', injectEnabled);
+    localStorage.setItem('injectEnabled', injectEnabled);
 
     if (injectEnabled) {
       // Show ID input, hide manual word input
@@ -437,11 +456,13 @@
       secretInput.classList.remove('hidden');
       stopInjectPolling();
       secretWord = '';
+      localStorage.removeItem('injectId');
     }
   });
 
   injectIdInput.addEventListener('input', () => {
     const id = injectIdInput.value.trim();
+    localStorage.setItem('injectId', id);
     if (injectEnabled && id) {
       startInjectPolling(id);
     } else {
