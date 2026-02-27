@@ -534,6 +534,7 @@
 
         cachedWordGrid = null;
         cachedEdgeGrid = null;
+        cachedCanvasSnapshot = null;
         injectStatus.textContent = 'Word: ' + secretWord;
         injectStatus.classList.add('connected');
       } else if (!data.value) {
@@ -570,6 +571,7 @@
       secretWord = cardValue + SUIT_SYMBOLS[cardSuit];
       cachedWordGrid = null;
       cachedEdgeGrid = null;
+      cachedCanvasSnapshot = null;
       cachedCardGrid = null;
 
       showScreen(cameraScreen);
@@ -602,6 +604,7 @@
     cardMode = false;
     cachedWordGrid = null;
     cachedEdgeGrid = null;
+    cachedCanvasSnapshot = null;
 
     // Switch to front camera for face shots
     facingMode = 'user';
@@ -752,6 +755,7 @@
       thumbnailPreview.classList.add('has-photo');
       cachedWordGrid = null;
       cachedEdgeGrid = null;
+      cachedCanvasSnapshot = null;
       cachedCardGrid = null;
 
     };
@@ -835,8 +839,39 @@
       letterGrids.push(grid);
     }
 
-    // Combine letter grids with 1-column spacing
-    const height = 5;
+    const LETTER_H = 5;
+
+    // Vertical layout for 6+ letter words (stacks letters top-to-bottom)
+    if (letters.length >= 6) {
+      // Find the max letter width to center-align all letters
+      let maxW = 0;
+      for (const g of letterGrids) maxW = Math.max(maxW, g[0].length);
+
+      const spacing = 1; // 1-row gap between letters
+      const totalH = letters.length * LETTER_H + (letters.length - 1) * spacing;
+      const combined = [];
+      for (let r = 0; r < totalH; r++) {
+        combined[r] = [];
+        for (let c = 0; c < maxW; c++) combined[r][c] = 0;
+      }
+
+      let yOff = 0;
+      for (let li = 0; li < letterGrids.length; li++) {
+        const g = letterGrids[li];
+        const gw = g[0].length;
+        const xOff = Math.floor((maxW - gw) / 2); // center each letter
+        for (let row = 0; row < LETTER_H; row++) {
+          for (let col = 0; col < gw; col++) {
+            combined[yOff + row][xOff + col] = g[row][col];
+          }
+        }
+        yOff += LETTER_H + spacing;
+      }
+
+      return combined;
+    }
+
+    // Horizontal layout for short words (5 letters or fewer)
     let totalWidth = 0;
     for (const g of letterGrids) {
       totalWidth += g[0].length + 1; // +1 for spacing
@@ -844,7 +879,7 @@
     totalWidth -= 1; // No trailing space
 
     const combined = [];
-    for (let row = 0; row < height; row++) {
+    for (let row = 0; row < LETTER_H; row++) {
       combined[row] = [];
       let col = 0;
       for (let li = 0; li < letterGrids.length; li++) {
@@ -997,6 +1032,7 @@
 
   let cachedWordGrid = null;
   let cachedEdgeGrid = null;
+  let cachedCanvasSnapshot = null;
 
   function renderSecretOverlay(drawX, drawY, scale, cw, ch, opacity) {
     if (!secretWord || !capturedImageData) return;
@@ -1340,7 +1376,7 @@
     if (!skullImg.complete || !skullImg.naturalWidth) return;
     ctx.save();
     // Ghost-like transparency
-    ctx.globalAlpha = alpha * 0.15;
+    ctx.globalAlpha = alpha * 0.05;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(skullImg, cx - skullW / 2, cy - skullH / 2, skullW, skullH);
     ctx.restore();
@@ -1351,7 +1387,7 @@
     if (!brainImg.complete || !brainImg.naturalWidth) return;
     ctx.save();
     // Ghost-like transparency
-    ctx.globalAlpha = alpha * 0.12;
+    ctx.globalAlpha = alpha * 0.04;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(brainImg, cx - brainW / 2, cy - brainH / 2, brainW, brainH);
     // Pulsing highlight (subtle animated glow)
@@ -1621,7 +1657,7 @@
         const startPX = imgCenterX - Math.floor(gridW / 2);
         const startPY = imgCenterY - Math.floor(gridH / 2);
 
-        const SHIFT = 25;
+        const SHIFT = 20;
         const BLEND = 0.50;
         const DITHER = 0.95;
         const gap = scale > 20 ? 1 : 0;
@@ -1632,30 +1668,41 @@
           return ((h & 0x7fffffff) / 0x7fffffff);
         }
 
-        // Snapshot the composited canvas (brain overlay already drawn)
-        // so word pixels blend with the brain texture, not the raw photo
-        const wordScreenX = Math.max(0, Math.floor(drawX + startPX * scale));
-        const wordScreenY = Math.max(0, Math.floor(drawY + startPY * scale));
-        const wordScreenW = Math.min(Math.ceil(gridW * scale) + 2, cw - wordScreenX);
-        const wordScreenH = Math.min(Math.ceil(gridH * scale) + 2, ch - wordScreenY);
-        var canvasSnapshot = null;
-        if (wordScreenW > 0 && wordScreenH > 0) {
-          canvasSnapshot = zoomCtx.getImageData(wordScreenX, wordScreenY, wordScreenW, wordScreenH);
+        // Cache canvas snapshot once (first frame L5 is active) so word
+        // pixels blend with the brain texture without frame-to-frame flicker
+        if (!cachedCanvasSnapshot) {
+          const wsX = Math.max(0, Math.floor(drawX + startPX * scale));
+          const wsY = Math.max(0, Math.floor(drawY + startPY * scale));
+          const wsW = Math.min(Math.ceil(gridW * scale) + 2, cw - wsX);
+          const wsH = Math.min(Math.ceil(gridH * scale) + 2, ch - wsY);
+          if (wsW > 0 && wsH > 0) {
+            cachedCanvasSnapshot = {
+              data: zoomCtx.getImageData(wsX, wsY, wsW, wsH),
+              offX: wsX,
+              offY: wsY,
+              drawX: drawX,
+              drawY: drawY,
+              scale: scale
+            };
+          }
         }
+        var snap = cachedCanvasSnapshot;
 
-        // Helper: sample pixel from composited canvas (includes brain overlay)
+        // Helper: sample pixel from cached composited canvas (includes brain overlay)
         function samplePixel(px, py) {
-          // Map image-space pixel to canvas screen coordinate (center of scaled pixel)
-          const sx = Math.floor(drawX + px * scale + scale / 2) - wordScreenX;
-          const sy = Math.floor(drawY + py * scale + scale / 2) - wordScreenY;
-          if (canvasSnapshot && sx >= 0 && sx < canvasSnapshot.width && sy >= 0 && sy < canvasSnapshot.height) {
-            const idx = (sy * canvasSnapshot.width + sx) * 4;
-            return [canvasSnapshot.data[idx], canvasSnapshot.data[idx + 1], canvasSnapshot.data[idx + 2]];
+          if (snap && snap.data) {
+            // Map image-space pixel to the cached snapshot coordinates
+            var sx = Math.floor(snap.drawX + px * snap.scale + snap.scale / 2) - snap.offX;
+            var sy = Math.floor(snap.drawY + py * snap.scale + snap.scale / 2) - snap.offY;
+            if (sx >= 0 && sx < snap.data.width && sy >= 0 && sy < snap.data.height) {
+              var idx = (sy * snap.data.width + sx) * 4;
+              return [snap.data.data[idx], snap.data.data[idx + 1], snap.data.data[idx + 2]];
+            }
           }
           // Fallback to raw image data
-          const cx = Math.max(0, Math.min(imgIW - 1, px));
-          const cy = Math.max(0, Math.min(imgIH - 1, py));
-          const idx = (cy * imgIW + cx) * 4;
+          var cx = Math.max(0, Math.min(imgIW - 1, px));
+          var cy = Math.max(0, Math.min(imgIH - 1, py));
+          var idx = (cy * imgIW + cx) * 4;
           return [imgData[idx], imgData[idx + 1], imgData[idx + 2]];
         }
 
@@ -1671,17 +1718,21 @@
                 const ef = cachedEdgeGrid[gy][gx];
                 if (rand > DITHER * ef) continue;
 
-                // Sample this pixel and its neighbors for smooth blending
-                const c  = samplePixel(px, py);
-                const cL = samplePixel(px - 1, py);
-                const cR = samplePixel(px + 1, py);
-                const cU = samplePixel(px, py - 1);
-                const cD = samplePixel(px, py + 1);
+                // Sample this pixel and all 8 neighbors for smooth blending
+                const c   = samplePixel(px, py);
+                const cL  = samplePixel(px - 1, py);
+                const cR  = samplePixel(px + 1, py);
+                const cU  = samplePixel(px, py - 1);
+                const cD  = samplePixel(px, py + 1);
+                const cUL = samplePixel(px - 1, py - 1);
+                const cUR = samplePixel(px + 1, py - 1);
+                const cDL = samplePixel(px - 1, py + 1);
+                const cDR = samplePixel(px + 1, py + 1);
 
-                // Weighted average: 40% center, 15% each neighbor
-                const origR = Math.round(c[0] * 0.4 + cL[0] * 0.15 + cR[0] * 0.15 + cU[0] * 0.15 + cD[0] * 0.15);
-                const origG = Math.round(c[1] * 0.4 + cL[1] * 0.15 + cR[1] * 0.15 + cU[1] * 0.15 + cD[1] * 0.15);
-                const origB = Math.round(c[2] * 0.4 + cL[2] * 0.15 + cR[2] * 0.15 + cU[2] * 0.15 + cD[2] * 0.15);
+                // Weighted average: 30% center, 10% cardinal, 5% diagonal
+                const origR = Math.round(c[0] * 0.30 + cL[0] * 0.10 + cR[0] * 0.10 + cU[0] * 0.10 + cD[0] * 0.10 + cUL[0] * 0.075 + cUR[0] * 0.075 + cDL[0] * 0.075 + cDR[0] * 0.075);
+                const origG = Math.round(c[1] * 0.30 + cL[1] * 0.10 + cR[1] * 0.10 + cU[1] * 0.10 + cD[1] * 0.10 + cUL[1] * 0.075 + cUR[1] * 0.075 + cDL[1] * 0.075 + cDR[1] * 0.075);
+                const origB = Math.round(c[2] * 0.30 + cL[2] * 0.10 + cR[2] * 0.10 + cU[2] * 0.10 + cD[2] * 0.10 + cUL[2] * 0.075 + cUR[2] * 0.075 + cDL[2] * 0.075 + cDR[2] * 0.075);
                 const brightness = (origR + origG + origB) / 3;
 
                 const noise = 0.8 + seededRand(px + 999, py + 777) * 0.4;
@@ -1992,6 +2043,7 @@
       capturedImageData = null;
       cachedWordGrid = null;
       cachedEdgeGrid = null;
+      cachedCanvasSnapshot = null;
       cachedCardGrid = null;
 
       cardMode = false;
