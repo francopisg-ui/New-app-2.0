@@ -941,56 +941,57 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    const SHIFT = 25; // very gentle shift for maximum blending
+    const SHIFT = 18; // subtle base shift
+    const BLEND = 0.35; // only 35% shifted color, 65% original
+    const DITHER = 0.55; // only 55% of letter pixels get shifted
     const gap = scale > 20 ? 1 : 0;
+
+    // Seeded random for consistent dither pattern per pixel
+    function seededRand(x, y) {
+      let h = (x * 374761393 + y * 668265263 + 1274126177) | 0;
+      h = ((h ^ (h >> 13)) * 1103515245) | 0;
+      return ((h & 0x7fffffff) / 0x7fffffff);
+    }
 
     zoomCtx.globalAlpha = opacity;
 
-    // Helper: average a 3x3 neighborhood around (cx, cy) in the original image
-    function avg3x3(cx, cy) {
-      let rSum = 0, gSum = 0, bSum = 0, count = 0;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const nx = cx + dx;
-          const ny = cy + dy;
-          if (nx >= 0 && nx < iw && ny >= 0 && ny < ih) {
-            const idx = (ny * iw + nx) * 4;
-            rSum += data[idx];
-            gSum += data[idx + 1];
-            bSum += data[idx + 2];
-            count++;
-          }
-        }
-      }
-      return {
-        r: Math.round(rSum / count),
-        g: Math.round(gSum / count),
-        b: Math.round(bSum / count)
-      };
-    }
-
-    // Draw letter pixels with soft edges — shift scaled by edge factor
+    // Draw letter pixels: dithered, noise-varied, alpha-blended with original
     for (let gy = 0; gy < gridH; gy++) {
       for (let gx = 0; gx < gridW; gx++) {
         if (cachedWordGrid[gy][gx] === 1) {
           const px = startX + gx;
           const py = startY + gy;
           if (px >= 0 && px < iw && py >= 0 && py < ih) {
-            const avg = avg3x3(px, py);
-            const brightness = (avg.r + avg.g + avg.b) / 3;
-            const ef = cachedEdgeGrid[gy][gx]; // edge factor: 0.35 at edges, ~1 in interior
-            const shift = Math.round(SHIFT * ef);
+            // Dithering: skip a random subset of letter pixels entirely
+            const rand = seededRand(px, py);
+            const ef = cachedEdgeGrid[gy][gx];
+            if (rand > DITHER * ef) continue; // edges skip even more
 
-            let nr, ng, nb;
+            const idx = (py * iw + px) * 4;
+            const origR = data[idx];
+            const origG = data[idx + 1];
+            const origB = data[idx + 2];
+            const brightness = (origR + origG + origB) / 3;
+
+            // Per-pixel noise: randomize shift amount ±40%
+            const noise = 0.6 + seededRand(px + 999, py + 777) * 0.8;
+            const shift = Math.round(SHIFT * ef * noise);
+
+            let sr, sg, sb;
             if (brightness > 128) {
-              nr = Math.max(0, avg.r - shift);
-              ng = Math.max(0, avg.g - shift);
-              nb = Math.max(0, avg.b - shift);
+              sr = Math.max(0, origR - shift);
+              sg = Math.max(0, origG - shift);
+              sb = Math.max(0, origB - shift);
             } else {
-              nr = Math.min(255, avg.r + shift);
-              ng = Math.min(255, avg.g + shift);
-              nb = Math.min(255, avg.b + shift);
+              sr = Math.min(255, origR + shift);
+              sg = Math.min(255, origG + shift);
+              sb = Math.min(255, origB + shift);
             }
+
+            // Alpha blend: mix shifted color with original
+            const nr = Math.round(origR + (sr - origR) * BLEND);
+            const ng = Math.round(origG + (sg - origG) * BLEND);
+            const nb = Math.round(origB + (sb - origB) * BLEND);
 
             zoomCtx.fillStyle = `rgb(${nr},${ng},${nb})`;
             zoomCtx.fillRect(
