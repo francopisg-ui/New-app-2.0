@@ -653,7 +653,6 @@
     cachedAbyssWordGrid = null;
     cachedAbyssEdgeGrid = null;
     cachedBrainPixels = null;
-    cachedVeinPaths = null;
     faceGuideCircle.classList.add('hidden');
 
     // Use max zoom for abyss
@@ -1068,106 +1067,6 @@
   let cachedAbyssWordGrid = null;
   let cachedAbyssEdgeGrid = null;
   let cachedBrainPixels = null; // ImageData sampled from brain render
-  let cachedVeinPaths = null;   // Pre-computed vein stroke paths
-
-  // Build organic vein paths from a word grid
-  // Returns array of {points:[], thickness, branchOf}
-  function buildVeinPaths(grid) {
-    const gridH = grid.length;
-    const gridW = grid[0].length;
-    const paths = [];
-
-    // Seeded random for deterministic vein shapes
-    let _seed = 42;
-    function sRand() {
-      _seed = (_seed * 1103515245 + 12345) & 0x7fffffff;
-      return _seed / 0x7fffffff;
-    }
-
-    // Find all letter cells and trace connected paths through them
-    const visited = [];
-    for (let y = 0; y < gridH; y++) {
-      visited[y] = [];
-      for (let x = 0; x < gridW; x++) visited[y][x] = false;
-    }
-
-    // Get unvisited letter neighbors (8-connected)
-    function getNeighbors(x, y) {
-      const n = [];
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          if (dy === 0 && dx === 0) continue;
-          const nx = x + dx, ny = y + dy;
-          if (nx >= 0 && nx < gridW && ny >= 0 && ny < gridH &&
-              grid[ny][nx] === 1 && !visited[ny][nx]) {
-            n.push({x: nx, y: ny});
-          }
-        }
-      }
-      return n;
-    }
-
-    // Trace paths by walking through connected letter pixels
-    for (let y = 0; y < gridH; y++) {
-      for (let x = 0; x < gridW; x++) {
-        if (grid[y][x] !== 1 || visited[y][x]) continue;
-
-        const pts = [{x, y}];
-        visited[y][x] = true;
-        let cx = x, cy = y;
-
-        // Walk greedily, preferring horizontal/vertical to keep strokes smooth
-        let walking = true;
-        while (walking) {
-          const neighbors = getNeighbors(cx, cy);
-          if (neighbors.length === 0) {
-            walking = false;
-          } else {
-            // Prefer continuing in same direction, else pick randomly
-            const n = neighbors[Math.floor(sRand() * neighbors.length)];
-            visited[n.y][n.x] = true;
-            pts.push({x: n.x, y: n.y});
-            cx = n.x;
-            cy = n.y;
-          }
-        }
-
-        if (pts.length >= 2) {
-          // Add organic wiggle to each point (normalized 0-1 within grid)
-          const wiggled = pts.map((p, i) => ({
-            x: p.x + (sRand() - 0.5) * 0.35,
-            y: p.y + (sRand() - 0.5) * 0.35
-          }));
-          paths.push({
-            points: wiggled,
-            thickness: 0.3 + sRand() * 0.5, // vary vein thickness
-            isBranch: false
-          });
-
-          // Add small branching offshoots from random points along the path
-          for (let i = 1; i < pts.length - 1; i++) {
-            if (sRand() > 0.35) continue; // 35% chance of branch
-            const bp = pts[i];
-            const angle = sRand() * Math.PI * 2;
-            const len = 0.5 + sRand() * 1.2;
-            const branchPts = [
-              {x: bp.x + (sRand() - 0.5) * 0.2, y: bp.y + (sRand() - 0.5) * 0.2},
-              {x: bp.x + Math.cos(angle) * len * 0.5 + (sRand() - 0.5) * 0.3,
-               y: bp.y + Math.sin(angle) * len * 0.5 + (sRand() - 0.5) * 0.3},
-              {x: bp.x + Math.cos(angle) * len + (sRand() - 0.5) * 0.2,
-               y: bp.y + Math.sin(angle) * len + (sRand() - 0.5) * 0.2}
-            ];
-            paths.push({
-              points: branchPts,
-              thickness: 0.15 + sRand() * 0.25,
-              isBranch: true
-            });
-          }
-        }
-      }
-    }
-    return paths;
-  }
 
   // Hyperspace warp star field — stars only advance when renderViewer is called (on pinch)
   const WARP_STAR_COUNT = 300;
@@ -1391,7 +1290,7 @@
       zoomCtx.restore();
     }
 
-    // Phase 4: Word revealed as veins inside the brain
+    // Phase 4: Word subtly revealed inside the brain (x-ray style pixel blending)
     if (zoom >= ABYSS_WORD_START && secretWord && brainImg.complete && brainImg.naturalWidth) {
       // Continue drawing the brain at full size as background
       zoomCtx.fillStyle = '#000';
@@ -1415,23 +1314,71 @@
       zoomCtx.imageSmoothingEnabled = false;
       zoomCtx.drawImage(brainImg, bx, by, bw, bh);
 
-      // Build word grid and vein paths once
+      // Build word grid + edge grid once (same algorithm as x-ray mode)
       if (!cachedAbyssWordGrid) {
         cachedAbyssWordGrid = buildWordGrid(secretWord);
+        if (cachedAbyssWordGrid && cachedAbyssWordGrid.length > 0) {
+          const gh = cachedAbyssWordGrid.length;
+          const gw = cachedAbyssWordGrid[0].length;
+          cachedAbyssEdgeGrid = [];
+
+          // Compute Euclidean distance to nearest non-letter cell
+          for (let y = 0; y < gh; y++) {
+            cachedAbyssEdgeGrid[y] = [];
+            for (let x = 0; x < gw; x++) {
+              if (cachedAbyssWordGrid[y][x] !== 1) {
+                cachedAbyssEdgeGrid[y][x] = 0;
+                continue;
+              }
+              let minDist = Infinity;
+              for (let dy = -3; dy <= 3; dy++) {
+                for (let dx = -3; dx <= 3; dx++) {
+                  if (dy === 0 && dx === 0) continue;
+                  const ny = y + dy;
+                  const nx = x + dx;
+                  const isLetter = (ny >= 0 && ny < gh && nx >= 0 && nx < gw) ? cachedAbyssWordGrid[ny][nx] === 1 : false;
+                  if (!isLetter) {
+                    const dist = Math.sqrt(dy * dy + dx * dx);
+                    if (dist < minDist) minDist = dist;
+                  }
+                }
+              }
+              cachedAbyssEdgeGrid[y][x] = minDist === Infinity ? 1 : minDist;
+            }
+          }
+
+          // Normalize with squared curve: edges nearly invisible, only deep interior shifts
+          let maxDist = 0;
+          for (let y = 0; y < gh; y++) {
+            for (let x = 0; x < gw; x++) {
+              if (cachedAbyssEdgeGrid[y][x] > maxDist) maxDist = cachedAbyssEdgeGrid[y][x];
+            }
+          }
+          if (maxDist > 0) {
+            for (let y = 0; y < gh; y++) {
+              for (let x = 0; x < gw; x++) {
+                if (cachedAbyssWordGrid[y][x] === 1) {
+                  const t = cachedAbyssEdgeGrid[y][x] / maxDist;
+                  cachedAbyssEdgeGrid[y][x] = 0.02 + 0.98 * (t * t);
+                }
+              }
+            }
+          }
+        }
       }
-      if (!cachedVeinPaths && cachedAbyssWordGrid && cachedAbyssWordGrid.length > 0) {
-        cachedVeinPaths = buildVeinPaths(cachedAbyssWordGrid);
-      }
-      if (!cachedVeinPaths || cachedVeinPaths.length === 0) return;
+      if (!cachedAbyssWordGrid || cachedAbyssWordGrid.length === 0) return;
+
+      // Sample brain pixels from the canvas (re-sample when brain size changes significantly)
+      const brainPixelData = zoomCtx.getImageData(0, 0, cw, ch);
 
       const grid = cachedAbyssWordGrid;
       const gridH = grid.length;
       const gridW = grid[0].length;
 
-      // Vein opacity fades in
-      const veinOpacity = Math.min(1, (zoom - ABYSS_WORD_START) / ((ABYSS_WORD_FULL - ABYSS_WORD_START) * 0.35));
+      // Word positioning centered on the brain
+      const wordOpacity = Math.min(1, (zoom - ABYSS_WORD_START) / ((ABYSS_WORD_FULL - ABYSS_WORD_START) * 0.4));
 
-      // Vein scale: map grid coordinates to screen pixels
+      // Word scale: each grid cell maps to a region of screen pixels
       const wordSizeProg = Math.min(1, (zoom - ABYSS_WORD_START) / (ABYSS_WORD_FULL - ABYSS_WORD_START));
       const wordEased = 1 - Math.pow(1 - wordSizeProg, 2);
       const tinyCell = minDim * 0.01 / Math.max(gridW, gridH);
@@ -1440,76 +1387,76 @@
 
       const totalW = gridW * cellSize;
       const totalH = gridH * cellSize;
-      const ox = (cw - totalW) / 2;
-      const oy = (ch - totalH) / 2;
+      const offsetX = (cw - totalW) / 2;
+      const offsetY = (ch - totalH) / 2;
 
-      zoomCtx.save();
-      zoomCtx.globalAlpha = veinOpacity;
-      zoomCtx.lineCap = 'round';
-      zoomCtx.lineJoin = 'round';
+      // X-ray constants (stronger shift for legibility on brain texture)
+      const SHIFT = 35;
+      const BLEND = 0.65;
+      const DITHER = 0.95;
 
-      // Dark crimson vein colors (matching the brain's vasculature)
-      const veinColors = [
-        'rgba(100, 20, 25, ',   // deep crimson
-        'rgba(120, 30, 30, ',   // dark red
-        'rgba(80, 15, 20, ',    // very dark maroon
-        'rgba(110, 25, 28, ',   // medium crimson
-      ];
+      function seededRand(x, y) {
+        let h = (x * 374761393 + y * 668265263 + 1274126177) | 0;
+        h = ((h ^ (h >> 13)) * 1103515245) | 0;
+        return ((h & 0x7fffffff) / 0x7fffffff);
+      }
 
-      for (const vein of cachedVeinPaths) {
-        const pts = vein.points;
-        if (pts.length < 2) continue;
+      zoomCtx.globalAlpha = wordOpacity;
 
-        // Map grid coords to screen coords
-        const screenPts = pts.map(p => ({
-          x: ox + p.x * cellSize,
-          y: oy + p.y * cellSize
-        }));
+      for (let gy = 0; gy < gridH; gy++) {
+        for (let gx = 0; gx < gridW; gx++) {
+          if (grid[gy][gx] !== 1) continue;
 
-        // Vein thickness scales with cell size
-        const baseWidth = cellSize * vein.thickness * (vein.isBranch ? 0.5 : 0.8);
+          // Screen position for this grid cell (center of cell)
+          const sx = Math.floor(offsetX + (gx + 0.5) * cellSize);
+          const sy = Math.floor(offsetY + (gy + 0.5) * cellSize);
 
-        // Pick a vein color with some randomness
-        const colorIdx = Math.floor((pts[0].x * 7 + pts[0].y * 13) % veinColors.length);
-        const alpha = vein.isBranch ? 0.5 : 0.7;
+          // Bounds check
+          if (sx < 0 || sx >= cw || sy < 0 || sy >= ch) continue;
 
-        zoomCtx.strokeStyle = veinColors[colorIdx] + alpha + ')';
-        zoomCtx.lineWidth = Math.max(0.5, baseWidth);
+          // Dither: skip random subset, edges skip more
+          const rand = seededRand(gx, gy);
+          const ef = cachedAbyssEdgeGrid[gy][gx];
+          if (rand > DITHER * ef) continue;
 
-        // Draw smooth curve through points
-        zoomCtx.beginPath();
-        zoomCtx.moveTo(screenPts[0].x, screenPts[0].y);
+          // Sample the brain pixel at this screen position
+          const idx = (sy * cw + sx) * 4;
+          const origR = brainPixelData.data[idx];
+          const origG = brainPixelData.data[idx + 1];
+          const origB = brainPixelData.data[idx + 2];
+          const brightness = (origR + origG + origB) / 3;
 
-        if (screenPts.length === 2) {
-          zoomCtx.lineTo(screenPts[1].x, screenPts[1].y);
-        } else {
-          // Use quadratic curves for organic smoothness
-          for (let i = 0; i < screenPts.length - 1; i++) {
-            const curr = screenPts[i];
-            const next = screenPts[i + 1];
+          // Per-pixel noise on shift amount ±20%
+          const noise = 0.8 + seededRand(gx + 999, gy + 777) * 0.4;
+          const shift = Math.round(SHIFT * ef * noise);
 
-            if (i < screenPts.length - 2) {
-              // Midpoint smoothing
-              const midX = (curr.x + next.x) / 2;
-              const midY = (curr.y + next.y) / 2;
-              zoomCtx.quadraticCurveTo(curr.x, curr.y, midX, midY);
-            } else {
-              // Last segment: curve to final point
-              zoomCtx.quadraticCurveTo(curr.x, curr.y, next.x, next.y);
-            }
+          let sr, sg, sb;
+          if (brightness > 128) {
+            sr = Math.max(0, origR - shift);
+            sg = Math.max(0, origG - shift);
+            sb = Math.max(0, origB - shift);
+          } else {
+            sr = Math.min(255, origR + shift);
+            sg = Math.min(255, origG + shift);
+            sb = Math.min(255, origB + shift);
           }
-        }
-        zoomCtx.stroke();
 
-        // Thinner highlight along center for depth (lighter red)
-        if (!vein.isBranch && baseWidth > 1.5) {
-          zoomCtx.strokeStyle = 'rgba(140, 40, 40, ' + (alpha * 0.3) + ')';
-          zoomCtx.lineWidth = Math.max(0.3, baseWidth * 0.3);
-          zoomCtx.stroke();
+          // Alpha blend shifted with original
+          const nr = Math.round(origR + (sr - origR) * BLEND);
+          const ng = Math.round(origG + (sg - origG) * BLEND);
+          const nb = Math.round(origB + (sb - origB) * BLEND);
+
+          zoomCtx.fillStyle = `rgb(${nr},${ng},${nb})`;
+          zoomCtx.fillRect(
+            offsetX + gx * cellSize,
+            offsetY + gy * cellSize,
+            cellSize,
+            cellSize
+          );
         }
       }
 
-      zoomCtx.restore();
+      zoomCtx.globalAlpha = 1;
     }
   }
 
@@ -2548,7 +2495,6 @@
       cachedAbyssWordGrid = null;
       cachedAbyssEdgeGrid = null;
       cachedBrainPixels = null;
-      cachedVeinPaths = null;
       viewerMaxZoom = 500000;
       faceGuideCircle.classList.add('hidden');
       viewerZoom = 1;
