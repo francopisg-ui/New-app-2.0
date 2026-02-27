@@ -25,6 +25,7 @@
   let abyssMode = false;
   const abyssLayers = [];
   const ABYSS_LAYER_SRCS = [
+    'assets/abyss/layer2.png',
     'assets/abyss/layer1.png',
     'assets/abyss/layer2.png',
     'assets/abyss/layer3.png',
@@ -38,17 +39,19 @@
   });
 
   // Abyss zoom thresholds
-  const ABYSS_FADE_START = 10000;      // Black fade begins
-  const ABYSS_FADE_END = 100000;       // Fully black
+  const ABYSS_FADE_START = 1000;       // Black fade begins (much sooner)
+  const ABYSS_FADE_END = 10000;        // Fully black by 10k
   const ABYSS_LAYER_RANGES = [
-    [100000, 300000],   // Layer 1: smoke wisp — appears at 100k, fully in by 300k
-    [200000, 500000],   // Layer 2: subtle haze — overlaps with layer 1
-    [350000, 650000],   // Layer 3: dense fog
-    [500000, 800000],   // Layer 4: ethereal light
-    [700000, 1000000]   // Layer 5: sparkles/stars
+    [10000, 100000],    // Layer 0 (layer2.png dupe): first wisp
+    [60000, 200000],    // Layer 1 (layer1.png): smoke wisp
+    [150000, 350000],   // Layer 2 (layer2.png): haze
+    [280000, 500000],   // Layer 3 (layer3.png): dense fog
+    [420000, 650000],   // Layer 4 (layer4.png): ethereal light
+    [580000, 800000]    // Layer 5 (layer5.png): sparkles/stars
   ];
-  const ABYSS_WORD_START = 1000000;    // Word begins appearing
-  const ABYSS_WORD_FULL = 1500000;     // Word fully opaque
+  const ABYSS_SMOKE_CLEAR = 900000;    // Smoke fully fades out by here
+  const ABYSS_WORD_START = 1000000;    // Word begins appearing (pure black)
+  const ABYSS_WORD_FULL = 1800000;     // Word fully opaque and large
   const ABYSS_MAX_ZOOM = 2000000;
 
   // X-Ray overlay images (loaded from base64 in xray-images.js)
@@ -1069,70 +1072,76 @@
   function renderAbyssEffect(cw, ch) {
     const zoom = viewerZoom;
 
-    // Phase 1: Gradual fade to black (10,000x — 100,000x)
+    // Phase 1: Gradual fade to black (1,000x — 10,000x)
     if (zoom >= ABYSS_FADE_START) {
       const fadeProgress = Math.min(1, (zoom - ABYSS_FADE_START) / (ABYSS_FADE_END - ABYSS_FADE_START));
       zoomCtx.fillStyle = `rgba(0, 0, 0, ${fadeProgress})`;
       zoomCtx.fillRect(0, 0, cw, ch);
     }
 
-    // Phase 2: Overlapping zoom-through layers (100,000x — 1,000,000x)
-    // Layers accumulate like x-ray mode: once a layer appears it stays.
-    // Each layer scales up as you zoom deeper, creating a fly-through effect.
+    // Phase 2: Overlapping zoom-through smoke layers
+    // Layers accumulate like x-ray mode, then all fade out together
+    // before the word appears, returning to pure black.
     if (zoom >= ABYSS_FADE_END) {
       // Solid black base behind all layers
       zoomCtx.fillStyle = '#000';
       zoomCtx.fillRect(0, 0, cw, ch);
 
-      // Render layers back to front (earliest layer = furthest back)
-      for (let i = 0; i < ABYSS_LAYER_RANGES.length; i++) {
-        const [start, end] = ABYSS_LAYER_RANGES[i];
-        if (zoom < start) continue; // Layer hasn't appeared yet
+      // Global smoke fade-out: all smoke dims to black approaching ABYSS_SMOKE_CLEAR
+      const lastLayerEnd = ABYSS_LAYER_RANGES[ABYSS_LAYER_RANGES.length - 1][1];
+      let smokeFade = 1;
+      if (zoom > lastLayerEnd) {
+        smokeFade = Math.max(0, 1 - (zoom - lastLayerEnd) / (ABYSS_SMOKE_CLEAR - lastLayerEnd));
+      }
 
-        const img = abyssLayers[i];
-        if (!img.complete || !img.naturalWidth) continue;
+      if (smokeFade > 0) {
+        for (let i = 0; i < ABYSS_LAYER_RANGES.length; i++) {
+          const [start, end] = ABYSS_LAYER_RANGES[i];
+          if (zoom < start) continue; // Layer hasn't appeared yet
 
-        // Fade-in: opacity ramps from 0 to full during [start, end]
-        const fadeIn = Math.min(1, (zoom - start) / (end - start));
-        // High alpha — the PNGs are already wispy transparent smoke
-        const layerOpacity = fadeIn * 0.85;
+          const img = abyssLayers[i];
+          if (!img.complete || !img.naturalWidth) continue;
 
-        // Zoom-through parallax: log scale so layers grow smoothly
-        // without early layers scaling off-screen too fast
-        const zoomRatio = zoom / start; // 1.0 at appear, grows from there
-        const layerScale = 1 + Math.log2(zoomRatio) * 0.5;
+          // Fade-in: opacity ramps from 0 to full during [start, end]
+          const fadeIn = Math.min(1, (zoom - start) / (end - start));
+          // High alpha since PNGs are already wispy, multiplied by global smoke fade
+          const layerOpacity = fadeIn * 0.85 * smokeFade;
 
-        // Scale layer to cover canvas (base fit), then apply parallax scale
-        const imgAspect = img.naturalWidth / img.naturalHeight;
-        const canvasAspect = cw / ch;
-        let baseW, baseH;
-        if (canvasAspect > imgAspect) {
-          baseW = cw;
-          baseH = cw / imgAspect;
-        } else {
-          baseH = ch;
-          baseW = ch * imgAspect;
+          // Zoom-through parallax: log scale so layers grow smoothly
+          const zoomRatio = zoom / start;
+          const layerScale = 1 + Math.log2(zoomRatio) * 0.5;
+
+          // Scale layer to cover canvas, then apply parallax scale
+          const imgAspect = img.naturalWidth / img.naturalHeight;
+          const canvasAspect = cw / ch;
+          let baseW, baseH;
+          if (canvasAspect > imgAspect) {
+            baseW = cw;
+            baseH = cw / imgAspect;
+          } else {
+            baseH = ch;
+            baseW = ch * imgAspect;
+          }
+          const drawW = baseW * layerScale;
+          const drawH = baseH * layerScale;
+          const drawX = (cw - drawW) / 2;
+          const drawY = (ch - drawH) / 2;
+
+          // Screen blend: overlapping layers stack additively
+          zoomCtx.save();
+          zoomCtx.globalCompositeOperation = 'screen';
+          zoomCtx.globalAlpha = layerOpacity;
+          zoomCtx.drawImage(img, drawX, drawY, drawW, drawH);
+          zoomCtx.restore();
         }
-        const drawW = baseW * layerScale;
-        const drawH = baseH * layerScale;
-        const drawX = (cw - drawW) / 2;
-        const drawY = (ch - drawH) / 2;
-
-        // Screen blend: black stays black, white smoke glows bright,
-        // overlapping layers stack additively
-        zoomCtx.save();
-        zoomCtx.globalCompositeOperation = 'screen';
-        zoomCtx.globalAlpha = layerOpacity;
-        zoomCtx.drawImage(img, drawX, drawY, drawW, drawH);
-        zoomCtx.restore();
       }
     }
 
-    // Phase 3: Secret word reveal (1,000,000x+)
+    // Phase 3: Word emerges from pure black (1,000,000x — 2,000,000x)
+    // Smoke has cleared. Word starts as a tiny speck and grows large.
     if (zoom >= ABYSS_WORD_START && secretWord) {
-      // Darken behind the word so it reads clearly over lingering layers
-      const wordProgress = Math.min(1, (zoom - ABYSS_WORD_START) / (ABYSS_WORD_FULL - ABYSS_WORD_START));
-      zoomCtx.fillStyle = `rgba(0, 0, 0, ${wordProgress * 0.85})`;
+      // Pure black behind the word
+      zoomCtx.fillStyle = '#000';
       zoomCtx.fillRect(0, 0, cw, ch);
 
       // Build word grid if needed
@@ -1145,11 +1154,18 @@
       const gridH = grid.length;
       const gridW = grid[0].length;
 
-      // Word grows as you zoom deeper past ABYSS_WORD_START
-      const zoomPastStart = zoom / ABYSS_WORD_START; // 1.0 at start, 2.0 at 2M
-      const minPixelSize = Math.min(cw, ch) / (Math.max(gridW, gridH) * 8);
-      const maxPixelSize = Math.min(cw, ch) / (Math.max(gridW, gridH) * 1.2);
-      const pixelSize = minPixelSize + (maxPixelSize - minPixelSize) * Math.min(1, (zoomPastStart - 1) / 1);
+      // Word opacity: fades in over first portion of the range
+      const wordOpacity = Math.min(1, (zoom - ABYSS_WORD_START) / ((ABYSS_WORD_FULL - ABYSS_WORD_START) * 0.3));
+
+      // Word size: starts very tiny, grows to fill screen
+      // Use smooth interpolation from ABYSS_WORD_START to ABYSS_WORD_FULL
+      const sizeProgress = Math.min(1, (zoom - ABYSS_WORD_START) / (ABYSS_WORD_FULL - ABYSS_WORD_START));
+      // Start at 2% of screen, grow to 80% of screen
+      const tinySize = Math.min(cw, ch) * 0.02 / Math.max(gridW, gridH);
+      const fullSize = Math.min(cw, ch) * 0.8 / Math.max(gridW, gridH);
+      // Ease-out curve so it accelerates then settles
+      const eased = 1 - Math.pow(1 - sizeProgress, 2);
+      const pixelSize = tinySize + (fullSize - tinySize) * eased;
 
       const totalW = gridW * pixelSize;
       const totalH = gridH * pixelSize;
@@ -1157,7 +1173,7 @@
       const offsetY = (ch - totalH) / 2;
 
       zoomCtx.save();
-      zoomCtx.globalAlpha = wordProgress;
+      zoomCtx.globalAlpha = wordOpacity;
 
       for (let row = 0; row < gridH; row++) {
         for (let col = 0; col < gridW; col++) {
