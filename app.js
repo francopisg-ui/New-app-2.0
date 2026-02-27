@@ -1421,10 +1421,13 @@
     // ========================================
     // X-RAY FADE-IN: Blue/cyan tint (like an x-ray machine powering on)
     // ========================================
-    if (xrayIntensity > 0) {
+    // When word is revealing, fade out all earlier effects so they don't bury it
+    const preWordFade = p5 > 0 ? Math.max(0, 1 - p5) : 1;
+
+    if (xrayIntensity > 0 && preWordFade > 0) {
       // Subtle blue-cyan tint that grows with x-ray intensity
       zoomCtx.save();
-      const blueAlpha = Math.min(xrayIntensity * 0.08, 0.08);
+      const blueAlpha = Math.min(xrayIntensity * 0.08, 0.08) * preWordFade;
       zoomCtx.globalCompositeOperation = 'multiply';
       zoomCtx.globalAlpha = blueAlpha;
       zoomCtx.fillStyle = '#6090d0';
@@ -1445,7 +1448,7 @@
       }
 
       // Radial vignette centered on face (dark edges, bright center)
-      const vignetteAlpha = Math.min(xrayIntensity * 0.12, 0.12);
+      const vignetteAlpha = Math.min(xrayIntensity * 0.12, 0.12) * preWordFade;
       if (vignetteAlpha > 0.02) {
         const vigRadius = Math.max(cw, ch) * 0.7;
         const grad = zoomCtx.createRadialGradient(
@@ -1466,11 +1469,11 @@
     // LAYER 1: Skin desaturation (1x - 1.3x)
     // Photo goes from color -> desaturated gray
     // ========================================
-    if (p1 > 0 && supportsFilter) {
+    if (p1 > 0 && supportsFilter && preWordFade > 0) {
       zoomCtx.save();
       const desat = Math.round(100 - p1 * 40); // 100% -> 60% (very gentle desaturation)
       const darkAmount = p1 * 0.05;
-      zoomCtx.globalAlpha = p1 * 0.4;
+      zoomCtx.globalAlpha = p1 * 0.4 * preWordFade;
       zoomCtx.filter = 'saturate(' + desat + '%) brightness(' + Math.round(100 - darkAmount * 100) + '%)';
       zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
       zoomCtx.filter = 'none';
@@ -1481,10 +1484,10 @@
     // LAYER 2: Tissue (1.1x - 1.8x)
     // Dark desaturated gray, contrast boost, "under the skin"
     // ========================================
-    if (p2 > 0) {
+    if (p2 > 0 && preWordFade > 0) {
       // Darken overlay (very subtle)
       zoomCtx.save();
-      zoomCtx.globalAlpha = p2 * 0.15;
+      zoomCtx.globalAlpha = p2 * 0.15 * preWordFade;
       zoomCtx.fillStyle = '#060610';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
@@ -1495,7 +1498,7 @@
         const invertAmt = Math.round(p2 * 40);
         const satAmt = Math.round(100 - p2 * 50);
         const contrastAmt = Math.round(100 + p2 * 30);
-        zoomCtx.globalAlpha = p2 * 0.3;
+        zoomCtx.globalAlpha = p2 * 0.3 * preWordFade;
         zoomCtx.filter = 'invert(' + invertAmt + '%) saturate(' + satAmt + '%) contrast(' + contrastAmt + '%) brightness(' + Math.round(100 + p2 * 20) + '%)';
         zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
         zoomCtx.filter = 'none';
@@ -1508,11 +1511,11 @@
     // LAYER 3: Skull (1.5x - 3x)
     // Inverted high-contrast face + drawn skull overlay
     // ========================================
-    if (p3 > 0) {
+    if (p3 > 0 && preWordFade > 0) {
       // X-ray inversion of the photo (subtle, face stays visible)
       if (supportsFilter) {
         zoomCtx.save();
-        zoomCtx.globalAlpha = p3 * 0.3;
+        zoomCtx.globalAlpha = p3 * 0.3 * preWordFade;
         zoomCtx.filter = 'invert(50%) saturate(15%) contrast(130%) brightness(120%)';
         zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
         zoomCtx.filter = 'none';
@@ -1521,7 +1524,7 @@
 
       // Darken non-skull areas (very subtle)
       zoomCtx.save();
-      zoomCtx.globalAlpha = p3 * 0.12;
+      zoomCtx.globalAlpha = p3 * 0.12 * preWordFade;
       zoomCtx.fillStyle = '#000008';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
@@ -1538,10 +1541,10 @@
     // LAYER 4: Brain cavity (2.5x - 4x)
     // Skull fades, dark void, brain shape appears
     // ========================================
-    if (p4 > 0) {
+    if (p4 > 0 && preWordFade > 0) {
       // Darkening for brain cavity (subtle)
       zoomCtx.save();
-      zoomCtx.globalAlpha = p4 * 0.2;
+      zoomCtx.globalAlpha = p4 * 0.2 * preWordFade;
       zoomCtx.fillStyle = '#010108';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
@@ -1580,8 +1583,8 @@
     if (p5 > 0) {
       // Dark backdrop behind word so it stands out clearly
       zoomCtx.save();
-      zoomCtx.globalAlpha = p5 * 0.85;
-      zoomCtx.fillStyle = '#000';
+      zoomCtx.globalAlpha = p5 * 0.9;
+      zoomCtx.fillStyle = '#0a0a14';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
 
@@ -1645,7 +1648,7 @@
     // ========================================
     // Film grain + scan lines overlay (present from the start)
     // ========================================
-    const grainIntensity = Math.max(p1 * 0.5, p2, p3, p4) * 0.7;
+    const grainIntensity = Math.max(p1 * 0.5, p2, p3, p4) * 0.7 * preWordFade;
     if (grainIntensity > 0.01) {
       // Use a smaller grain canvas for performance, tile it
       const grainW = Math.min(cw, 512);
@@ -1662,9 +1665,9 @@
       zoomCtx.restore();
     }
 
-    // Global scan lines from the start (x-ray film look)
-    if (p1 > 0.3) {
-      drawScanLines(zoomCtx, cw, ch, Math.min(p1, 0.6));
+    // Global scan lines from the start (x-ray film look) — fade out during word reveal
+    if (p1 > 0.3 && preWordFade > 0) {
+      drawScanLines(zoomCtx, cw, ch, Math.min(p1, 0.6) * preWordFade);
     }
   }
 
