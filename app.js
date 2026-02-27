@@ -915,12 +915,13 @@
           }
         }
 
-        // Normalize to 0.15..1.0 range (outermost pixels very subtle, interior full)
+        // Normalize with squared curve: edges nearly invisible, only deep interior gets full shift
         if (maxDist > 0) {
           for (let y = 0; y < gh; y++) {
             for (let x = 0; x < gw; x++) {
               if (cachedWordGrid[y][x] === 1) {
-                cachedEdgeGrid[y][x] = 0.15 + 0.85 * (cachedEdgeGrid[y][x] / maxDist);
+                const t = cachedEdgeGrid[y][x] / maxDist;
+                cachedEdgeGrid[y][x] = 0.02 + 0.98 * (t * t);
               }
             }
           }
@@ -940,7 +941,7 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    const SHIFT = 35; // gentle shift for natural blending
+    const SHIFT = 25; // very gentle shift for maximum blending
     const gap = scale > 20 ? 1 : 0;
 
     zoomCtx.globalAlpha = opacity;
