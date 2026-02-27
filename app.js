@@ -1657,7 +1657,7 @@
         const startPX = imgCenterX - Math.floor(gridW / 2);
         const startPY = imgCenterY - Math.floor(gridH / 2);
 
-        const SHIFT = 17;
+        const SHIFT = 13;
         const BLEND = 0.50;
         const DITHER = 0.95;
         const gap = scale > 20 ? 1 : 0;
