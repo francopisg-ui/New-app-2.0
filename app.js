@@ -973,8 +973,8 @@
             const origB = data[idx + 2];
             const brightness = (origR + origG + origB) / 3;
 
-            // Per-pixel noise: randomize shift amount ±40%
-            const noise = 0.6 + seededRand(px + 999, py + 777) * 0.8;
+            // Per-pixel noise: randomize shift amount ±20%
+            const noise = 0.8 + seededRand(px + 999, py + 777) * 0.4;
             const shift = Math.round(SHIFT * ef * noise);
 
             let sr, sg, sb;
