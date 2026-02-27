@@ -29,9 +29,9 @@
   const ABYSS_FADE_END = 1000;         // Fully black by 1000x — very gradual fade
   const ABYSS_BRAIN_START = 2040;      // Brain appears while stars still fading (+20%)
   const ABYSS_BRAIN_FULL = 3840;       // Brain fills most of the screen (+20%)
-  const ABYSS_WORD_START = 6000;       // Word begins appearing deep inside brain
-  const ABYSS_WORD_FULL = 28000;       // Word fully visible
-  const ABYSS_MAX_ZOOM = 30000;
+  const ABYSS_WORD_START = 18000;      // Word begins appearing once brain is pixelated
+  const ABYSS_WORD_FULL = 45000;       // Word fully visible
+  const ABYSS_MAX_ZOOM = 50000;
 
   // X-Ray overlay image (loaded from base64 in xray-images.js)
   const brainImg = new Image();
@@ -1245,15 +1245,22 @@
     }
 
     // Phase 3: Brain approaches from the void (layers over fading stars)
-    if (zoom >= ABYSS_BRAIN_START && brainImg.complete && brainImg.naturalWidth) {
+    if (zoom >= ABYSS_BRAIN_START && zoom < ABYSS_WORD_START && brainImg.complete && brainImg.naturalWidth) {
       const brainProg = Math.min(1, (zoom - ABYSS_BRAIN_START) / (ABYSS_BRAIN_FULL - ABYSS_BRAIN_START));
       const brainEased = 1 - Math.pow(1 - brainProg, 2);
 
-      // Brain grows from a tiny speck to filling ~70% of the screen
+      // Brain grows from a tiny speck to filling ~70% of the screen, then keeps zooming in
       const minDim = Math.min(cw, ch);
       const tinyBrain = minDim * 0.03;
       const fullBrain = minDim * 0.7;
-      const brainSize = tinyBrain + (fullBrain - tinyBrain) * brainEased;
+      let brainSize = tinyBrain + (fullBrain - tinyBrain) * brainEased;
+
+      // Continue growing after brain is "full" — zoom deeper into it
+      if (zoom > ABYSS_BRAIN_FULL) {
+        const deepProg = (zoom - ABYSS_BRAIN_FULL) / (ABYSS_WORD_START - ABYSS_BRAIN_FULL);
+        const deepEased = 1 - Math.pow(1 - Math.min(1, deepProg), 2);
+        brainSize = fullBrain * (1 + deepEased * 12);
+      }
 
       // Maintain aspect ratio of the brain image
       const aspect = brainImg.naturalWidth / brainImg.naturalHeight;
@@ -1266,6 +1273,7 @@
       const brainAlpha = Math.min(1, brainProg / 0.25);
 
       zoomCtx.save();
+      zoomCtx.imageSmoothingEnabled = false;
       zoomCtx.globalAlpha = brainAlpha * 0.85;
       zoomCtx.drawImage(brainImg, bx, by, bw, bh);
 
@@ -1294,7 +1302,7 @@
       // Brain keeps growing past full, simulating deep zoom-in
       const zoomInProg = Math.min(1, (zoom - ABYSS_WORD_START) / (ABYSS_MAX_ZOOM - ABYSS_WORD_START));
       const zoomEased = 1 - Math.pow(1 - zoomInProg, 2);
-      const brainSize = fullBrain * (1 + zoomEased * 10); // grows to 11x
+      const brainSize = fullBrain * (1 + zoomEased * 20); // grows to 21x
 
       const aspect = brainImg.naturalWidth / brainImg.naturalHeight;
       const bw = aspect >= 1 ? brainSize : brainSize * aspect;
@@ -1302,7 +1310,8 @@
       const bx = (cw - bw) / 2;
       const by = (ch - bh) / 2;
 
-      // Draw brain at full opacity first
+      // Draw brain pixelated (no smoothing) so pixels are visible at deep zoom
+      zoomCtx.imageSmoothingEnabled = false;
       zoomCtx.drawImage(brainImg, bx, by, bw, bh);
 
       // Build word grid + edge grid once (same algorithm as x-ray mode)
