@@ -1410,11 +1410,11 @@
 
     const data = capturedImageData.data;
     // Shift amounts: card bg gets a lighter shift, ink gets a darker shift, border is medium
-    const BG_SHIFT = 15;    // card background: lighten
-    const INK_SHIFT = 15;   // ink (values, pips): darken
-    const BORDER_SHIFT = 10; // border: subtle darken
-    const BLEND = 0.50;
-    const DITHER = 0.95;
+    const BG_SHIFT = 60;    // card background: lighten strongly
+    const INK_SHIFT = 70;   // ink (values, pips): darken strongly
+    const BORDER_SHIFT = 45; // border: visible darken
+    const BLEND = 0.85;
+    const DITHER = 1.0;
     const gap = scale > 20 ? 1 : 0;
 
     function seededRand(x, y) {
@@ -1803,9 +1803,9 @@
       // Get source photo pixel data for shifting
       const srcData = sourceCtx.getImageData(0, 0, cw, ch);
       const srcPixels = srcData.data;
-      const BG_SHIFT = 20;
-      const INK_SHIFT = 25;
-      const BORDER_SHIFT = 15;
+      const BG_SHIFT = 60;
+      const INK_SHIFT = 70;
+      const BORDER_SHIFT = 45;
 
       // Draw card as shifted photo pixels onto wordCanvas
       for (let gy = 0; gy < CARD_H; gy++) {
