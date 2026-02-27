@@ -26,7 +26,7 @@
 
   // Abyss zoom thresholds
   const ABYSS_FADE_START = 80;         // Black fade begins very early
-  const ABYSS_FADE_END = 600;          // Fully black by 600x — gradual fade
+  const ABYSS_FADE_END = 1000;         // Fully black by 1000x — very gradual fade
   const ABYSS_WORD_START = 2500;       // Word begins appearing
   const ABYSS_WORD_FULL = 4500;        // Word fully opaque and large
   const ABYSS_MAX_ZOOM = 5000;
@@ -1016,6 +1016,15 @@
     // Determine if we should render pixel grid or normal image
     const pixelSize = scale; // Size of one image pixel on screen
 
+    // In abyss mode, make the photo gradually transparent so the black
+    // canvas shows through — blends naturally with the overlay fade
+    if (abyssMode && viewerZoom >= ABYSS_FADE_START) {
+      const fadeProg = Math.min(1, (viewerZoom - ABYSS_FADE_START) / (ABYSS_FADE_END - ABYSS_FADE_START));
+      // Transparency kicks in after the first 15% of the fade range, then eases
+      const photoFade = Math.max(0, (fadeProg - 0.15) / 0.85);
+      zoomCtx.globalAlpha = 1 - photoFade * photoFade * 0.9;
+    }
+
     if (pixelSize > 8) {
       // Render as pixel grid — this is the "zoomed in" look
       renderPixelGrid(drawX, drawY, scale, cw, ch);
@@ -1024,6 +1033,9 @@
       zoomCtx.imageSmoothingEnabled = pixelSize < 1;
       zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
     }
+
+    // Reset alpha after drawing photo
+    zoomCtx.globalAlpha = 1;
 
     // Overlay reveal — fades in gradually
     if (abyssMode) {
@@ -1190,10 +1202,13 @@
   function renderAbyssEffect(cw, ch) {
     const zoom = viewerZoom;
 
-    // Phase 1: Gradual fade to black (500x — 3,000x)
+    // Phase 1: Gradual fade to black — ease-in curve so it starts very gently
+    // Combined with photo transparency for a smooth, blended transition
     if (zoom >= ABYSS_FADE_START) {
       const fadeProgress = Math.min(1, (zoom - ABYSS_FADE_START) / (ABYSS_FADE_END - ABYSS_FADE_START));
-      zoomCtx.fillStyle = `rgba(0, 0, 0, ${fadeProgress})`;
+      // Cubic ease-in: barely noticeable at first, accelerates toward the end
+      const easedFade = fadeProgress * fadeProgress * fadeProgress;
+      zoomCtx.fillStyle = `rgba(0, 0, 0, ${easedFade})`;
       zoomCtx.fillRect(0, 0, cw, ch);
     }
 
