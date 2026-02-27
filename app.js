@@ -18,6 +18,9 @@
   let cardValue = ''; // 'A','2'-'10','J','Q','K'
   let cachedCardGrid = null;
 
+  // X-Ray mode state
+  let xrayMode = false;
+
   // Inject state
   let injectEnabled = false;
   let injectId = '';
@@ -391,6 +394,10 @@
   const injectIdInput = document.getElementById('inject-id-input');
   const injectStatus = document.getElementById('inject-status');
 
+  // X-Ray mode DOM
+  const xrayModeBtn = document.getElementById('xray-mode-btn');
+  const faceGuideCircle = document.getElementById('face-guide-circle');
+
   // Card mode DOM
   const cardModeBtn = document.getElementById('card-mode-btn');
   const cardSuitScreen = document.getElementById('card-suit-screen');
@@ -409,6 +416,8 @@
 
   // --- Secret Word Entry ---
   secretSubmit.addEventListener('click', () => {
+    xrayMode = false;
+    faceGuideCircle.classList.add('hidden');
     if (injectEnabled) {
       // Inject mode: need ID and a word must have been received
       const id = injectIdInput.value.trim();
@@ -536,6 +545,8 @@
 
   cardModeBtn.addEventListener('click', () => {
     cardMode = true;
+    xrayMode = false;
+    faceGuideCircle.classList.add('hidden');
     showScreen(cardSuitScreen);
   });
 
@@ -570,6 +581,30 @@
   cardBackToSuit.addEventListener('click', () => {
     cardValue = '';
     showScreen(cardSuitScreen);
+  });
+
+  // --- X-Ray Mode ---
+  xrayModeBtn.addEventListener('click', () => {
+    const word = secretInput.value.trim();
+    if (injectEnabled) {
+      if (!secretWord) return;
+    } else {
+      if (word.length === 0) return;
+      secretWord = word.toUpperCase();
+    }
+    xrayMode = true;
+    cardMode = false;
+    cachedWordGrid = null;
+    cachedEdgeGrid = null;
+
+    // Switch to front camera for face shots
+    facingMode = 'user';
+
+    // Show face guide circle
+    faceGuideCircle.classList.remove('hidden');
+
+    showScreen(cameraScreen);
+    startCamera();
   });
 
   // --- Camera ---
@@ -676,6 +711,9 @@
 
   function capturePhoto() {
     if (!currentStream) return;
+
+    // Hide face guide circle on capture (like the center dot)
+    faceGuideCircle.classList.add('hidden');
 
     // Shutter flash animation
     const flash = document.createElement('div');
@@ -903,7 +941,9 @@
     }
 
     // Overlay reveal — fades in gradually
-    if (viewerZoom >= SECRET_REVEAL_THRESHOLD) {
+    if (xrayMode) {
+      renderXrayEffect(drawX, drawY, scale, cw, ch);
+    } else if (viewerZoom >= SECRET_REVEAL_THRESHOLD) {
       const opacity = Math.min(1, (viewerZoom - SECRET_REVEAL_THRESHOLD) / (SECRET_FULL_OPACITY_ZOOM - SECRET_REVEAL_THRESHOLD));
       if (cardMode) {
         renderCardOverlay(drawX, drawY, scale, cw, ch, opacity);
@@ -1239,6 +1279,115 @@
     zoomCtx.globalAlpha = 1;
   }
 
+  // --- X-Ray Effect Rendering ---
+  // Thresholds for x-ray progression
+  const XRAY_START_ZOOM = 1.5;   // x-ray tint begins
+  const XRAY_WORD_ZOOM = 4;      // word starts appearing
+  const XRAY_FULL_ZOOM = 12;     // full transparency, word fully visible
+
+  function renderXrayEffect(drawX, drawY, scale, cw, ch) {
+    if (!secretWord || !capturedImage) return;
+
+    // Calculate x-ray intensity (0 = normal photo, 1 = full x-ray)
+    const xrayIntensity = viewerZoom <= XRAY_START_ZOOM ? 0 :
+      Math.min(1, (viewerZoom - XRAY_START_ZOOM) / (XRAY_FULL_ZOOM - XRAY_START_ZOOM));
+
+    // Word visibility (0 = hidden, 1 = fully visible)
+    const wordVisibility = viewerZoom <= XRAY_WORD_ZOOM ? 0 :
+      Math.min(1, (viewerZoom - XRAY_WORD_ZOOM) / (XRAY_FULL_ZOOM - XRAY_WORD_ZOOM));
+
+    if (xrayIntensity <= 0) return; // Not zoomed enough yet
+
+    const iw = capturedImage.width;
+    const ih = capturedImage.height;
+
+    // --- Draw the secret word underneath (revealed as photo fades) ---
+    if (wordVisibility > 0) {
+      const wordGrid = cachedWordGrid || (cachedWordGrid = buildWordGrid(secretWord));
+      if (wordGrid && wordGrid.length > 0) {
+        const gridH = wordGrid.length;
+        const gridW = wordGrid[0].length;
+
+        // Position at face/center
+        const imgCenterX = wordEmbedPosition ? wordEmbedPosition.x : Math.floor(iw / 2);
+        const imgCenterY = wordEmbedPosition ? wordEmbedPosition.y : Math.floor(ih / 2);
+
+        // Screen coordinates of word center
+        const wordScreenX = drawX + imgCenterX * scale;
+        const wordScreenY = drawY + imgCenterY * scale;
+
+        // Scale word to be readable at current zoom
+        const wordPixelScale = scale * 1.0;
+        const totalW = gridW * wordPixelScale;
+        const totalH = gridH * wordPixelScale;
+        const wordStartX = wordScreenX - totalW / 2;
+        const wordStartY = wordScreenY - totalH / 2;
+
+        // Glowing x-ray word effect
+        zoomCtx.save();
+
+        // Outer glow
+        const glowAlpha = wordVisibility * 0.3;
+        zoomCtx.shadowColor = 'rgba(0, 170, 255, ' + glowAlpha + ')';
+        zoomCtx.shadowBlur = 20 * wordVisibility;
+        zoomCtx.globalAlpha = wordVisibility * 0.9;
+
+        for (let gy = 0; gy < gridH; gy++) {
+          for (let gx = 0; gx < gridW; gx++) {
+            if (wordGrid[gy][gx] === 1) {
+              const px = wordStartX + gx * wordPixelScale;
+              const py = wordStartY + gy * wordPixelScale;
+
+              // Bright cyan/white for x-ray word
+              const bright = 180 + Math.floor(75 * wordVisibility);
+              zoomCtx.fillStyle = 'rgb(' + Math.floor(bright * 0.7) + ',' + bright + ',' + bright + ')';
+              zoomCtx.fillRect(px, py, wordPixelScale, wordPixelScale);
+            }
+          }
+        }
+
+        zoomCtx.restore();
+      }
+    }
+
+    // --- X-ray overlay on the photo (blue tint + transparency) ---
+    zoomCtx.save();
+
+    // Darken: semi-transparent dark overlay that increases with zoom
+    zoomCtx.globalAlpha = xrayIntensity * 0.6;
+    zoomCtx.fillStyle = '#000';
+    zoomCtx.fillRect(0, 0, cw, ch);
+
+    // Blue/cyan x-ray tint overlay
+    zoomCtx.globalAlpha = xrayIntensity * 0.25;
+    zoomCtx.fillStyle = '#004466';
+    zoomCtx.fillRect(0, 0, cw, ch);
+
+    zoomCtx.restore();
+
+    // Re-draw the photo with x-ray filter and decreasing opacity
+    // This creates the "seeing through" effect
+    const photoAlpha = Math.max(0.08, 1 - xrayIntensity * 0.85);
+    const supportsFilter = typeof zoomCtx.filter === 'string';
+
+    zoomCtx.save();
+    zoomCtx.globalAlpha = photoAlpha;
+
+    // Apply x-ray visual filter: invert + blue shift + high contrast
+    if (supportsFilter) {
+      const invertPct = Math.round(xrayIntensity * 85);
+      const satPct = Math.round(100 - xrayIntensity * 70);
+      const brightPct = Math.round(100 + xrayIntensity * 30);
+      const hueDeg = Math.round(xrayIntensity * 190);
+      zoomCtx.filter = 'invert(' + invertPct + '%) saturate(' + satPct + '%) brightness(' + brightPct + '%) hue-rotate(' + hueDeg + 'deg)';
+    }
+
+    const drawW = iw * scale;
+    const drawH = ih * scale;
+    zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
+    zoomCtx.restore();
+  }
+
   function updateZoomIndicator() {
     const displayZoom = viewerZoom.toFixed(1);
     zoomIndicator.textContent = displayZoom + 'x';
@@ -1492,6 +1641,8 @@
       cardMode = false;
       cardSuit = '';
       cardValue = '';
+      xrayMode = false;
+      faceGuideCircle.classList.add('hidden');
       viewerZoom = 1;
       viewerPanX = 0;
       viewerPanY = 0;

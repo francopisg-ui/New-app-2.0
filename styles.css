@@ -175,6 +175,17 @@ html, body {
   opacity: 0.7;
 }
 
+.xray-mode-btn {
+  background: #1c1c1e !important;
+  border: 1px solid #0af !important;
+  font-size: 15px !important;
+  color: #0af !important;
+}
+
+.xray-mode-btn:active {
+  opacity: 0.7;
+}
+
 #card-suit-screen,
 #card-value-screen {
   background: #000;
@@ -248,6 +259,19 @@ html, body {
   height: 1px;
   background: #fff;
   transform: translate(-50%, -50%);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.face-guide-circle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 220px;
+  height: 300px;
+  transform: translate(-50%, -55%);
+  border: 2px solid rgba(0, 170, 255, 0.5);
+  border-radius: 50%;
   z-index: 10;
   pointer-events: none;
 }
