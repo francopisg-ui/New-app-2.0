@@ -27,11 +27,11 @@
   // Abyss zoom thresholds
   const ABYSS_FADE_START = 80;         // Black fade begins very early
   const ABYSS_FADE_END = 1000;         // Fully black by 1000x — very gradual fade
-  const ABYSS_BRAIN_START = 1700;      // Brain appears while stars still fading
-  const ABYSS_BRAIN_FULL = 3200;       // Brain fills most of the screen
-  const ABYSS_WORD_START = 5000;       // Word begins appearing deep inside brain
-  const ABYSS_WORD_FULL = 14000;       // Word fully visible
-  const ABYSS_MAX_ZOOM = 15000;
+  const ABYSS_BRAIN_START = 2040;      // Brain appears while stars still fading (+20%)
+  const ABYSS_BRAIN_FULL = 3840;       // Brain fills most of the screen (+20%)
+  const ABYSS_WORD_START = 6000;       // Word begins appearing deep inside brain
+  const ABYSS_WORD_FULL = 28000;       // Word fully visible
+  const ABYSS_MAX_ZOOM = 30000;
 
   // X-Ray overlay image (loaded from base64 in xray-images.js)
   const brainImg = new Image();
@@ -1294,7 +1294,7 @@
       // Brain keeps growing past full, simulating deep zoom-in
       const zoomInProg = Math.min(1, (zoom - ABYSS_WORD_START) / (ABYSS_MAX_ZOOM - ABYSS_WORD_START));
       const zoomEased = 1 - Math.pow(1 - zoomInProg, 2);
-      const brainSize = fullBrain * (1 + zoomEased * 6); // grows to 7x
+      const brainSize = fullBrain * (1 + zoomEased * 10); // grows to 11x
 
       const aspect = brainImg.naturalWidth / brainImg.naturalHeight;
       const bw = aspect >= 1 ? brainSize : brainSize * aspect;
@@ -1381,9 +1381,9 @@
       const offsetX = (cw - totalW) / 2;
       const offsetY = (ch - totalH) / 2;
 
-      // X-ray constants (match renderSecretOverlay)
-      const SHIFT = 18;
-      const BLEND = 0.50;
+      // X-ray constants (stronger shift for legibility on brain texture)
+      const SHIFT = 35;
+      const BLEND = 0.65;
       const DITHER = 0.95;
 
       function seededRand(x, y) {
