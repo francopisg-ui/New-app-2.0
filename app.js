@@ -31,7 +31,7 @@
   const ABYSS_BRAIN_FULL = 3200;       // Brain fills most of the screen
   const ABYSS_WORD_START = 3400;       // Word begins appearing inside brain
   const ABYSS_WORD_FULL = 4800;        // Word fully visible
-  const ABYSS_MAX_ZOOM = 5000;
+  const ABYSS_MAX_ZOOM = 5250;
 
   // X-Ray overlay image (loaded from base64 in xray-images.js)
   const brainImg = new Image();
