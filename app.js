@@ -31,9 +31,7 @@
   const ABYSS_WORD_FULL = 4500;        // Word fully opaque and large
   const ABYSS_MAX_ZOOM = 5000;
 
-  // X-Ray overlay images (loaded from base64 in xray-images.js)
-  const skullImg = new Image();
-  skullImg.src = typeof SKULL_B64 !== 'undefined' ? SKULL_B64 : '';
+  // X-Ray overlay image (loaded from base64 in xray-images.js)
   const brainImg = new Image();
   brainImg.src = typeof BRAIN_B64 !== 'undefined' ? BRAIN_B64 : '';
 
@@ -1659,23 +1657,12 @@
     return (zoom - start) / (end - start);
   }
 
-  // --- Draw skull overlay (image-based, face-tracked) ---
-  function drawSkullOverlay(ctx, cx, cy, skullW, skullH, alpha) {
-    if (!skullImg.complete || !skullImg.naturalWidth) return;
-    ctx.save();
-    // Ghost-like transparency
-    ctx.globalAlpha = alpha * 0.12;
-    ctx.globalCompositeOperation = 'screen';
-    ctx.drawImage(skullImg, cx - skullW / 2, cy - skullH / 2, skullW, skullH);
-    ctx.restore();
-  }
-
   // --- Draw brain overlay (image-based, face-tracked) ---
   function drawBrainOverlay(ctx, cx, cy, brainW, brainH, alpha) {
     if (!brainImg.complete || !brainImg.naturalWidth) return;
     ctx.save();
     // Ghost-like transparency
-    ctx.globalAlpha = alpha * 0.10;
+    ctx.globalAlpha = alpha * 0.12;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(brainImg, cx - brainW / 2, cy - brainH / 2, brainW, brainH);
     // Pulsing highlight (subtle animated glow)
@@ -1722,12 +1709,10 @@
     const faceScreenX = drawX + facePosX * scale;
     const faceScreenY = drawY + facePosY * scale;
 
-    // Skull/brain size scales with zoom (sized to fill the face guide circle)
+    // Brain size scales with zoom (sized to fill the face guide circle)
     const faceSize = Math.min(iw, ih) * 0.5 * scale;
-    const skullW = faceSize * 1.4;
-    const skullH = faceSize * 1.35;
-    const brainW = faceSize * 0.9;
-    const brainH = faceSize * 0.7;
+    const brainW = faceSize * 1.2;
+    const brainH = faceSize * 1.15;
 
     // Layer progress values (0-1 each)
     const p1 = layerProgress(viewerZoom, XRAY_L1_START, XRAY_L1_END); // skin desat
@@ -1829,8 +1814,8 @@
     }
 
     // ========================================
-    // LAYER 3: Skull (1.5x - 3x)
-    // Inverted high-contrast face + drawn skull overlay
+    // LAYER 3: Brain reveal (1.3x - 2.5x)
+    // Inverted high-contrast face + brain overlay fades in
     // ========================================
     if (p3 > 0) {
       // X-ray inversion of the photo (subtle, face stays visible)
@@ -1843,24 +1828,24 @@
         zoomCtx.restore();
       }
 
-      // Darken non-skull areas (very subtle)
+      // Darken surrounding areas (very subtle)
       zoomCtx.save();
       zoomCtx.globalAlpha = p3 * 0.12;
       zoomCtx.fillStyle = '#000008';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
 
-      // Drawn skull overlay - face tracked
-      drawSkullOverlay(zoomCtx, faceScreenX, faceScreenY, skullW, skullH, p3);
+      // Brain overlay fades in — face tracked
+      const brainY = faceScreenY - brainH * 0.08;
+      drawBrainOverlay(zoomCtx, faceScreenX, brainY, brainW, brainH, p3);
 
-      // Scan lines during skull phase
+      // Scan lines during brain reveal
       drawScanLines(zoomCtx, cw, ch, p3);
-
     }
 
     // ========================================
-    // LAYER 4: Brain cavity (2.5x - 4x)
-    // Skull fades, dark void, brain shape appears
+    // LAYER 4: Brain cavity (2.0x - 3.0x)
+    // Darker void, brain fully visible
     // ========================================
     if (p4 > 0) {
       // Darkening for brain cavity (subtle)
@@ -1870,17 +1855,8 @@
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
 
-      // Fading skull (becomes more transparent as brain appears)
-      if (p3 > 0) {
-        const fadingSkull = Math.max(0, 1 - p4);
-        if (fadingSkull > 0) {
-          drawSkullOverlay(zoomCtx, faceScreenX, faceScreenY, skullW, skullH, fadingSkull * 0.5);
-        }
-      }
-
-      // Brain shape appears
-      // Position brain slightly above and deeper than face center
-      const brainY = faceScreenY - skullH * 0.15;
+      // Brain at full presence
+      const brainY = faceScreenY - brainH * 0.08;
       drawBrainOverlay(zoomCtx, faceScreenX, brainY, brainW, brainH, p4);
 
       // Light scan lines
