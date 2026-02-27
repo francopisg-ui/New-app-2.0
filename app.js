@@ -1116,6 +1116,77 @@
     }
   }
 
+  // Procedural smoke particles — soft gradient blobs that drift through the starfield
+  const SMOKE_PARTICLE_COUNT = 40;
+  const smokeParticles = [];
+  for (let i = 0; i < SMOKE_PARTICLE_COUNT; i++) {
+    smokeParticles.push({
+      x: Math.random(),             // 0–1 normalized position
+      y: Math.random(),
+      z: Math.random(),             // depth (0 = far, 1 = close)
+      size: 0.08 + Math.random() * 0.18,  // base radius as fraction of screen
+      drift: (Math.random() - 0.5) * 0.3, // horizontal drift direction
+      speed: 0.003 + Math.random() * 0.007,
+      // Each puff gets a subtle color tint
+      hue: Math.random() < 0.5 ? 220 : 260, // blue or purple
+      sat: 20 + Math.random() * 30
+    });
+  }
+
+  function updateAndDrawSmoke(cw, ch, intensity, step) {
+    const cx = cw / 2;
+    const cy = ch / 2;
+
+    for (let i = 0; i < SMOKE_PARTICLE_COUNT; i++) {
+      const p = smokeParticles[i];
+
+      // Move particle toward camera (like stars)
+      p.z += p.speed * (1 + intensity * 6) * step * 25;
+      // Drift horizontally
+      p.x += p.drift * step * 0.5;
+
+      // Reset when it passes the camera or drifts off screen
+      if (p.z >= 1 || p.x < -0.3 || p.x > 1.3) {
+        p.x = 0.2 + Math.random() * 0.6;
+        p.y = 0.2 + Math.random() * 0.6;
+        p.z = 0.01;
+        p.size = 0.08 + Math.random() * 0.18;
+        p.drift = (Math.random() - 0.5) * 0.3;
+        p.speed = 0.003 + Math.random() * 0.007;
+        p.hue = Math.random() < 0.5 ? 220 : 260;
+        p.sat = 20 + Math.random() * 30;
+      }
+
+      // Perspective projection — puffs grow as they approach
+      const perspective = 1 + p.z * 3;
+      const screenX = cx + (p.x - 0.5) * cw * perspective * 0.5;
+      const screenY = cy + (p.y - 0.5) * ch * perspective * 0.5;
+      const radius = p.size * Math.min(cw, ch) * perspective;
+
+      // Opacity: fades in, peaks in middle depth, fades out close
+      let alpha = intensity * 0.25;
+      if (p.z < 0.2) {
+        alpha *= p.z / 0.2;         // fade in
+      } else if (p.z > 0.7) {
+        alpha *= (1 - p.z) / 0.3;   // fade out as it passes
+      }
+      if (alpha < 0.005) continue;
+
+      // Draw soft radial gradient blob
+      const grad = zoomCtx.createRadialGradient(screenX, screenY, 0, screenX, screenY, radius);
+      const col = `hsla(${p.hue}, ${p.sat}%, 70%, `;
+      grad.addColorStop(0, col + (alpha * 1.2) + ')');
+      grad.addColorStop(0.4, col + (alpha * 0.6) + ')');
+      grad.addColorStop(1, col + '0)');
+
+      zoomCtx.save();
+      zoomCtx.globalCompositeOperation = 'screen';
+      zoomCtx.fillStyle = grad;
+      zoomCtx.fillRect(screenX - radius, screenY - radius, radius * 2, radius * 2);
+      zoomCtx.restore();
+    }
+  }
+
   function renderAbyssEffect(cw, ch) {
     const zoom = viewerZoom;
 
@@ -1126,10 +1197,14 @@
       zoomCtx.fillRect(0, 0, cw, ch);
     }
 
-    // Phase 2: Hyperspace warp (3,000x — 500,000x)
+    // Phase 2: Hyperspace warp + smoke (3,000x — 500,000x)
     if (zoom >= ABYSS_FADE_END) {
       zoomCtx.fillStyle = '#000';
       zoomCtx.fillRect(0, 0, cw, ch);
+
+      // Shared zoom-based movement step for stars and smoke
+      const zoomDelta = Math.abs(zoom - lastWarpZoom) / zoom;
+      const step = Math.min(0.3, zoomDelta * 50);
 
       // Warp intensity ramps up, then fades out before word
       let warpIntensity = Math.min(1, (zoom - ABYSS_FADE_END) / 100000);
@@ -1139,6 +1214,7 @@
       }
       if (warpIntensity > 0) {
         updateAndDrawWarp(cw, ch, warpIntensity);
+        updateAndDrawSmoke(cw, ch, warpIntensity, step);
       }
     }
 
