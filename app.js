@@ -1075,7 +1075,7 @@
       const s = warpStars[i];
 
       // Move star toward camera proportional to zoom change (gentle pace)
-      s.z += s.speed * (1 + intensity * 4) * step * 8;
+      s.z += s.speed * (1 + intensity * 4) * step * 6;
 
       // Reset star when it passes the camera
       if (s.z >= 1) {
