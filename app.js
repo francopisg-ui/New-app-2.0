@@ -773,7 +773,7 @@
 
     // Per-pixel adaptive embedding: each text pixel samples its 3x3 neighbors
     // and shifts slightly to blend with surroundings
-    const EMBED_SHIFT = 65;
+    const EMBED_SHIFT = 25;
 
     // Write the word grid into the image with per-pixel neighbor blending
     for (let gy = 0; gy < gridH; gy++) {
@@ -1280,17 +1280,17 @@
   }
 
   // --- X-Ray Effect Rendering (5-Layer System) ---
-  // Layer boundaries — fast transition, all layers within 1x-5x zoom
+  // Layer boundaries — spread across 1x-35x zoom, word reveal at ~30x
   const XRAY_L1_START = 1.0;  // Layer 1 starts: skin desaturation (instant)
-  const XRAY_L1_END = 1.3;    // Layer 1 peaks
-  const XRAY_L2_START = 1.1;  // Layer 2 starts: tissue
-  const XRAY_L2_END = 1.8;    // Layer 2 peaks
-  const XRAY_L3_START = 1.5;  // Layer 3 starts: skull
-  const XRAY_L3_END = 3.0;    // Layer 3 peaks
-  const XRAY_L4_START = 2.5;  // Layer 4 starts: brain cavity
-  const XRAY_L4_END = 4.0;    // Layer 4 peaks
-  const XRAY_L5_START = 3.5;  // Layer 5 starts: word reveal
-  const XRAY_L5_END = 5.0;    // Layer 5 fully visible
+  const XRAY_L1_END = 3.0;    // Layer 1 peaks
+  const XRAY_L2_START = 2.0;  // Layer 2 starts: tissue
+  const XRAY_L2_END = 8.0;    // Layer 2 peaks
+  const XRAY_L3_START = 6.0;  // Layer 3 starts: skull
+  const XRAY_L3_END = 16.0;   // Layer 3 peaks
+  const XRAY_L4_START = 14.0; // Layer 4 starts: brain cavity
+  const XRAY_L4_END = 24.0;   // Layer 4 peaks
+  const XRAY_L5_START = 22.0; // Layer 5 starts: word reveal
+  const XRAY_L5_END = 35.0;   // Layer 5 fully visible (~30x center)
 
   // Grain texture canvas (generated once, reused)
   let grainCanvas = null;
@@ -2121,7 +2121,10 @@
         const wordCenterX = faceScreenX;
         const wordCenterY = faceScreenY + skullH * 0.05;
 
-        const wordPixelScale = scale * 1.0;
+        // Cap word size so every letter fits on screen at high zoom
+        const maxWordW = cw * 0.85;
+        const maxWordH = ch * 0.4;
+        const wordPixelScale = Math.min(scale, maxWordW / gridW, maxWordH / gridH);
         const totalW = gridW * wordPixelScale;
         const totalH = gridH * wordPixelScale;
         const wordStartX = wordCenterX - totalW / 2;
@@ -2147,7 +2150,7 @@
         }
         zoomCtx.restore();
 
-        // Main word - bone white matching skull tone
+        // Main word - bone white with neighbor-aware blending for natural feel
         zoomCtx.save();
         zoomCtx.globalAlpha = p5 * 0.95;
         zoomCtx.shadowColor = 'rgba(220, 230, 240, ' + (p5 * 0.6) + ')';
@@ -2155,14 +2158,33 @@
         for (let gy = 0; gy < gridH; gy++) {
           for (let gx = 0; gx < gridW; gx++) {
             if (wordGrid[gy][gx] === 1) {
-              // Bone-white with slight warm tone (like real x-ray bone)
-              const b = 210 + Math.floor(40 * p5);
-              zoomCtx.fillStyle = 'rgb(' + b + ',' + Math.floor(b * 0.97) + ',' + Math.floor(b * 0.93) + ')';
+              // Count how many of the 8 neighbors are also letter pixels
+              let neighborCount = 0;
+              for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                  if (dy === 0 && dx === 0) continue;
+                  const ny = gy + dy;
+                  const nx = gx + dx;
+                  if (ny >= 0 && ny < gridH && nx >= 0 && nx < gridW && wordGrid[ny][nx] === 1) {
+                    neighborCount++;
+                  }
+                }
+              }
+              // Interior pixels (many neighbors) are brighter; edge pixels softer
+              const neighborFactor = 0.6 + 0.4 * (neighborCount / 8);
+              const b = Math.floor((210 + 40 * p5) * neighborFactor);
+              // Slight per-pixel variation for organic feel
+              const noise = 0.92 + 0.16 * (((gx * 374761 + gy * 668265) & 0xffff) / 0xffff);
+              const finalB = Math.min(255, Math.floor(b * noise));
+              zoomCtx.fillStyle = 'rgb(' + finalB + ',' + Math.floor(finalB * 0.97) + ',' + Math.floor(finalB * 0.93) + ')';
+
+              // Edge pixels get slightly smaller for soft border effect
+              const edgeShrink = neighborCount < 4 ? wordPixelScale * 0.08 : 0;
               zoomCtx.fillRect(
-                wordStartX + gx * wordPixelScale,
-                wordStartY + gy * wordPixelScale,
-                wordPixelScale,
-                wordPixelScale
+                wordStartX + gx * wordPixelScale + edgeShrink,
+                wordStartY + gy * wordPixelScale + edgeShrink,
+                wordPixelScale - edgeShrink * 2,
+                wordPixelScale - edgeShrink * 2
               );
             }
           }
@@ -2219,10 +2241,10 @@
     const baseScale = Math.max(cw / iw, ch / ih);
 
     const targetPos = wordEmbedPosition || { x: iw / 2, y: ih / 2 };
-    const targetZoom = 25;
-    const zoomInDuration = 3000;
+    const targetZoom = 35;
+    const zoomInDuration = 4000;
     const pauseDuration = 1500;
-    const zoomOutDuration = 2000;
+    const zoomOutDuration = 2500;
     const totalDuration = zoomInDuration + pauseDuration + zoomOutDuration;
     const startTime = performance.now();
 
