@@ -1092,16 +1092,15 @@
         const img = abyssLayers[i];
         if (!img.complete || !img.naturalWidth) continue;
 
-        // Fade-in: opacity ramps from 0 to max during [start, end]
+        // Fade-in: opacity ramps from 0 to full during [start, end]
         const fadeIn = Math.min(1, (zoom - start) / (end - start));
-        // Max transparency — keep layers very see-through so they stack nicely
-        const maxAlpha = 0.35;
-        const layerOpacity = fadeIn * maxAlpha;
+        // High alpha — the PNGs are already wispy transparent smoke
+        const layerOpacity = fadeIn * 0.85;
 
-        // Zoom-through parallax: layer starts at 1x scale and grows
-        // as you zoom past it, like you're flying through it
-        const zoomPast = zoom / start; // 1.0 when layer first appears, grows from there
-        const layerScale = 1 + (zoomPast - 1) * 0.8; // Grows 80% of zoom ratio
+        // Zoom-through parallax: log scale so layers grow smoothly
+        // without early layers scaling off-screen too fast
+        const zoomRatio = zoom / start; // 1.0 at appear, grows from there
+        const layerScale = 1 + Math.log2(zoomRatio) * 0.5;
 
         // Scale layer to cover canvas (base fit), then apply parallax scale
         const imgAspect = img.naturalWidth / img.naturalHeight;
@@ -1119,7 +1118,10 @@
         const drawX = (cw - drawW) / 2;
         const drawY = (ch - drawH) / 2;
 
+        // Screen blend: black stays black, white smoke glows bright,
+        // overlapping layers stack additively
         zoomCtx.save();
+        zoomCtx.globalCompositeOperation = 'screen';
         zoomCtx.globalAlpha = layerOpacity;
         zoomCtx.drawImage(img, drawX, drawY, drawW, drawH);
         zoomCtx.restore();
