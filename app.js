@@ -1436,7 +1436,7 @@
 
     // Skull/brain size scales with zoom (sized to fill the face guide circle)
     const faceSize = Math.min(iw, ih) * 0.5 * scale;
-    const skullW = faceSize * 1.3;
+    const skullW = faceSize * 1.5;
     const skullH = faceSize * 1.35;
     const brainW = faceSize * 0.9;
     const brainH = faceSize * 0.7;
@@ -1947,7 +1947,7 @@
         if (now - lastViewerTapTime < 400) {
           lastViewerTapTime = 0;
           viewerTouchStartPos = null;
-          startMeltAnimation();
+          setTimeout(() => startMeltAnimation(), 3000);
           return;
         }
         lastViewerTapTime = now;
