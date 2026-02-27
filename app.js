@@ -17,7 +17,6 @@
   let cardSuit = '';  // 'spades', 'hearts', 'clubs', 'diamonds'
   let cardValue = ''; // 'A','2'-'10','J','Q','K'
   let cachedCardGrid = null;
-  let cachedCardEdgeGrid = null;
 
   // Inject state
   let injectEnabled = false;
@@ -555,7 +554,6 @@
       cachedWordGrid = null;
       cachedEdgeGrid = null;
       cachedCardGrid = null;
-      cachedCardEdgeGrid = null;
       showScreen(cameraScreen);
       startCamera();
     });
@@ -1355,48 +1353,6 @@
 
     if (!cachedCardGrid) {
       cachedCardGrid = buildCardGrid(cardSuit, cardValue);
-      // Build edge-distance grid for dithering (same approach as word reveal)
-      const gh = CARD_H;
-      const gw = CARD_W;
-      cachedCardEdgeGrid = [];
-      for (let y = 0; y < gh; y++) {
-        cachedCardEdgeGrid[y] = [];
-        for (let x = 0; x < gw; x++) {
-          if (cachedCardGrid[y][x] === 0) {
-            cachedCardEdgeGrid[y][x] = 0;
-            continue;
-          }
-          let minDist = Infinity;
-          for (let dy = -3; dy <= 3; dy++) {
-            for (let dx = -3; dx <= 3; dx++) {
-              if (dy === 0 && dx === 0) continue;
-              const ny = y + dy, nx = x + dx;
-              const isCard = (ny >= 0 && ny < gh && nx >= 0 && nx < gw) ? cachedCardGrid[ny][nx] > 0 : false;
-              if (!isCard) {
-                const dist = Math.sqrt(dy * dy + dx * dx);
-                if (dist < minDist) minDist = dist;
-              }
-            }
-          }
-          cachedCardEdgeGrid[y][x] = minDist === Infinity ? 1 : minDist;
-        }
-      }
-      let maxDist = 0;
-      for (let y = 0; y < gh; y++) {
-        for (let x = 0; x < gw; x++) {
-          if (cachedCardEdgeGrid[y][x] > maxDist) maxDist = cachedCardEdgeGrid[y][x];
-        }
-      }
-      if (maxDist > 0) {
-        for (let y = 0; y < gh; y++) {
-          for (let x = 0; x < gw; x++) {
-            if (cachedCardGrid[y][x] > 0) {
-              const t = cachedCardEdgeGrid[y][x] / maxDist;
-              cachedCardEdgeGrid[y][x] = 0.02 + 0.98 * (t * t);
-            }
-          }
-        }
-      }
     }
 
     const gridH = cachedCardGrid.length;
@@ -1409,12 +1365,9 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    // Shift amounts: card bg gets a lighter shift, ink gets a darker shift, border is medium
-    const BG_SHIFT = 60;    // card background: lighten strongly
-    const INK_SHIFT = 70;   // ink (values, pips): darken strongly
-    const BORDER_SHIFT = 45; // border: visible darken
-    const BLEND = 0.85;
-    const DITHER = 1.0;
+    const BG_SHIFT = 80;     // card background: lighten
+    const INK_SHIFT = 100;   // ink (values, pips): darken strongly
+    const BORDER_SHIFT = 60; // border: darken medium
     const gap = scale > 20 ? 1 : 0;
 
     function seededRand(x, y) {
@@ -1432,41 +1385,34 @@
           const px = startX + gx;
           const py = startY + gy;
           if (px >= 0 && px < iw && py >= 0 && py < ih) {
-            const rand = seededRand(px, py);
-            const ef = cachedCardEdgeGrid[gy][gx];
-            if (rand > DITHER * ef) continue;
-
             const idx = (py * iw + px) * 4;
             const origR = data[idx];
             const origG = data[idx + 1];
             const origB = data[idx + 2];
 
-            const noise = 0.8 + seededRand(px + 999, py + 777) * 0.4;
-            let shift, sr, sg, sb;
+            // Slight noise for organic texture
+            const noise = 0.9 + seededRand(px, py) * 0.2;
+            let nr, ng, nb;
 
             if (cell === 1) {
-              // Card background: always lighten
-              shift = Math.round(BG_SHIFT * ef * noise);
-              sr = Math.min(255, origR + shift);
-              sg = Math.min(255, origG + shift);
-              sb = Math.min(255, origB + shift);
+              // Card background: lighten
+              const shift = Math.round(BG_SHIFT * noise);
+              nr = Math.min(255, origR + shift);
+              ng = Math.min(255, origG + shift);
+              nb = Math.min(255, origB + shift);
             } else if (cell === 4) {
-              // Border: always darken slightly
-              shift = Math.round(BORDER_SHIFT * ef * noise);
-              sr = Math.max(0, origR - shift);
-              sg = Math.max(0, origG - shift);
-              sb = Math.max(0, origB - shift);
+              // Border: darken medium
+              const shift = Math.round(BORDER_SHIFT * noise);
+              nr = Math.max(0, origR - shift);
+              ng = Math.max(0, origG - shift);
+              nb = Math.max(0, origB - shift);
             } else {
-              // Ink (2=black, 3=suit color): always darken
-              shift = Math.round(INK_SHIFT * ef * noise);
-              sr = Math.max(0, origR - shift);
-              sg = Math.max(0, origG - shift);
-              sb = Math.max(0, origB - shift);
+              // Ink (2=black, 3=red): darken strongly
+              const shift = Math.round(INK_SHIFT * noise);
+              nr = Math.max(0, origR - shift);
+              ng = Math.max(0, origG - shift);
+              nb = Math.max(0, origB - shift);
             }
-
-            const nr = Math.round(origR + (sr - origR) * BLEND);
-            const ng = Math.round(origG + (sg - origG) * BLEND);
-            const nb = Math.round(origB + (sb - origB) * BLEND);
 
             zoomCtx.fillStyle = `rgb(${nr},${ng},${nb})`;
             zoomCtx.fillRect(
@@ -1732,7 +1678,6 @@
       cachedWordGrid = null;
       cachedEdgeGrid = null;
       cachedCardGrid = null;
-      cachedCardEdgeGrid = null;
       cardMode = false;
       cardSuit = '';
       cardValue = '';
@@ -1803,9 +1748,9 @@
       // Get source photo pixel data for shifting
       const srcData = sourceCtx.getImageData(0, 0, cw, ch);
       const srcPixels = srcData.data;
-      const BG_SHIFT = 60;
-      const INK_SHIFT = 70;
-      const BORDER_SHIFT = 45;
+      const BG_SHIFT = 80;
+      const INK_SHIFT = 100;
+      const BORDER_SHIFT = 60;
 
       // Draw card as shifted photo pixels onto wordCanvas
       for (let gy = 0; gy < CARD_H; gy++) {
