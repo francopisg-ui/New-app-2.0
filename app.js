@@ -27,9 +27,9 @@
   // Abyss zoom thresholds
   const ABYSS_FADE_START = 500;        // Black fade begins almost immediately
   const ABYSS_FADE_END = 3000;         // Fully black by 3k — stars begin here
-  const ABYSS_WORD_START = 500000;     // Word begins appearing
-  const ABYSS_WORD_FULL = 900000;      // Word fully opaque and large
-  const ABYSS_MAX_ZOOM = 1000000;
+  const ABYSS_WORD_START = 50000;      // Word begins appearing
+  const ABYSS_WORD_FULL = 90000;       // Word fully opaque and large
+  const ABYSS_MAX_ZOOM = 100000;
 
   // X-Ray overlay images (loaded from base64 in xray-images.js)
   const skullImg = new Image();
@@ -1163,20 +1163,20 @@
       const screenY = cy + (p.y - 0.5) * ch * perspective * 0.5;
       const radius = p.size * Math.min(cw, ch) * perspective;
 
-      // Opacity: fades in, peaks in middle depth, fades out close
-      let alpha = intensity * 0.25;
+      // Opacity: very light and transparent
+      let alpha = intensity * 0.07;
       if (p.z < 0.2) {
         alpha *= p.z / 0.2;         // fade in
       } else if (p.z > 0.7) {
         alpha *= (1 - p.z) / 0.3;   // fade out as it passes
       }
-      if (alpha < 0.005) continue;
+      if (alpha < 0.002) continue;
 
-      // Draw soft radial gradient blob
+      // Draw soft radial gradient blob — very subtle
       const grad = zoomCtx.createRadialGradient(screenX, screenY, 0, screenX, screenY, radius);
       const col = `hsla(${p.hue}, ${p.sat}%, 70%, `;
-      grad.addColorStop(0, col + (alpha * 1.2) + ')');
-      grad.addColorStop(0.4, col + (alpha * 0.6) + ')');
+      grad.addColorStop(0, col + (alpha * 0.8) + ')');
+      grad.addColorStop(0.3, col + (alpha * 0.3) + ')');
       grad.addColorStop(1, col + '0)');
 
       zoomCtx.save();
@@ -1197,7 +1197,7 @@
       zoomCtx.fillRect(0, 0, cw, ch);
     }
 
-    // Phase 2: Hyperspace warp + smoke (3,000x — 500,000x)
+    // Phase 2: Hyperspace warp + smoke (3,000x — 50,000x)
     if (zoom >= ABYSS_FADE_END) {
       zoomCtx.fillStyle = '#000';
       zoomCtx.fillRect(0, 0, cw, ch);
@@ -1207,7 +1207,7 @@
       const step = Math.min(0.3, zoomDelta * 50);
 
       // Warp intensity ramps up, then fades out before word
-      let warpIntensity = Math.min(1, (zoom - ABYSS_FADE_END) / 100000);
+      let warpIntensity = Math.min(1, (zoom - ABYSS_FADE_END) / 10000);
       const warpFadeStart = ABYSS_WORD_START * 0.85;
       if (zoom > warpFadeStart) {
         warpIntensity *= Math.max(0, 1 - (zoom - warpFadeStart) / (ABYSS_WORD_START - warpFadeStart));
