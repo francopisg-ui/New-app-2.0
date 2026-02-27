@@ -27,11 +27,11 @@
   // Abyss zoom thresholds
   const ABYSS_FADE_START = 80;         // Black fade begins very early
   const ABYSS_FADE_END = 1000;         // Fully black by 1000x — very gradual fade
-  const ABYSS_BRAIN_START = 2000;      // Brain appears from the void
+  const ABYSS_BRAIN_START = 1700;      // Brain appears while stars still fading
   const ABYSS_BRAIN_FULL = 3200;       // Brain fills most of the screen
   const ABYSS_WORD_START = 3400;       // Word begins appearing inside brain
   const ABYSS_WORD_FULL = 4800;        // Word fully visible
-  const ABYSS_MAX_ZOOM = 5250;
+  const ABYSS_MAX_ZOOM = 7000;
 
   // X-Ray overlay image (loaded from base64 in xray-images.js)
   const brainImg = new Image();
@@ -1231,11 +1231,12 @@
       const zoomDelta = Math.abs(zoom - lastWarpZoom) / zoom;
       const step = Math.min(0.3, zoomDelta * 50);
 
-      // Warp intensity ramps up, then fades out before brain
+      // Warp intensity ramps up, then fades out overlapping with brain appearance
       let warpIntensity = Math.min(1, (zoom - ABYSS_FADE_END) / 500);
-      const warpFadeStart = ABYSS_BRAIN_START * 0.85;
+      const warpFadeStart = ABYSS_BRAIN_START;
+      const warpFadeEnd = ABYSS_BRAIN_START + (ABYSS_BRAIN_FULL - ABYSS_BRAIN_START) * 0.5;
       if (zoom > warpFadeStart) {
-        warpIntensity *= Math.max(0, 1 - (zoom - warpFadeStart) / (ABYSS_BRAIN_START - warpFadeStart));
+        warpIntensity *= Math.max(0, 1 - (zoom - warpFadeStart) / (warpFadeEnd - warpFadeStart));
       }
       if (warpIntensity > 0) {
         updateAndDrawWarp(cw, ch, warpIntensity);
@@ -1243,11 +1244,8 @@
       }
     }
 
-    // Phase 3: Brain approaches from the void
+    // Phase 3: Brain approaches from the void (layers over fading stars)
     if (zoom >= ABYSS_BRAIN_START && brainImg.complete && brainImg.naturalWidth) {
-      zoomCtx.fillStyle = '#000';
-      zoomCtx.fillRect(0, 0, cw, ch);
-
       const brainProg = Math.min(1, (zoom - ABYSS_BRAIN_START) / (ABYSS_BRAIN_FULL - ABYSS_BRAIN_START));
       const brainEased = 1 - Math.pow(1 - brainProg, 2);
 
