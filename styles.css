@@ -186,6 +186,19 @@ html, body {
   opacity: 0.7;
 }
 
+.abyss-mode-btn {
+  background: #0a0a0a !important;
+  border: 1px solid #333 !important;
+  font-size: 15px !important;
+  color: #888 !important;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.abyss-mode-btn:active {
+  opacity: 0.7;
+}
+
 #card-suit-screen,
 #card-value-screen {
   background: #000;

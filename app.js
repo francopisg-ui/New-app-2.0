@@ -21,6 +21,36 @@
   // X-Ray mode state
   let xrayMode = false;
 
+  // Black Abyss mode state
+  let abyssMode = false;
+  const abyssLayers = [];
+  const ABYSS_LAYER_SRCS = [
+    'assets/abyss/layer1.png',
+    'assets/abyss/layer2.png',
+    'assets/abyss/layer3.png',
+    'assets/abyss/layer4.png',
+    'assets/abyss/layer5.png'
+  ];
+  ABYSS_LAYER_SRCS.forEach(src => {
+    const img = new Image();
+    img.src = src;
+    abyssLayers.push(img);
+  });
+
+  // Abyss zoom thresholds
+  const ABYSS_FADE_START = 10000;      // Black fade begins
+  const ABYSS_FADE_END = 100000;       // Fully black
+  const ABYSS_LAYER_RANGES = [
+    [100000, 200000],   // Layer 1: smoke wisp
+    [200000, 400000],   // Layer 2: subtle haze
+    [400000, 600000],   // Layer 3: dense fog
+    [600000, 800000],   // Layer 4: ethereal light
+    [800000, 1000000]   // Layer 5: sparkles/stars
+  ];
+  const ABYSS_WORD_START = 1000000;    // Word begins appearing
+  const ABYSS_WORD_FULL = 1500000;     // Word fully opaque
+  const ABYSS_MAX_ZOOM = 2000000;
+
   // X-Ray overlay images (loaded from base64 in xray-images.js)
   const skullImg = new Image();
   skullImg.src = typeof SKULL_B64 !== 'undefined' ? SKULL_B64 : '';
@@ -404,6 +434,9 @@
   const xrayModeBtn = document.getElementById('xray-mode-btn');
   const faceGuideCircle = document.getElementById('face-guide-circle');
 
+  // Black Abyss mode DOM
+  const abyssModeBtn = document.getElementById('abyss-mode-btn');
+
   // Card mode DOM
   const cardModeBtn = document.getElementById('card-mode-btn');
   const cardSuitScreen = document.getElementById('card-suit-screen');
@@ -423,6 +456,8 @@
   // --- Secret Word Entry ---
   secretSubmit.addEventListener('click', () => {
     xrayMode = false;
+    abyssMode = false;
+    viewerMaxZoom = 500000;
     faceGuideCircle.classList.add('hidden');
     if (injectEnabled) {
       // Inject mode: need ID and a word must have been received
@@ -553,6 +588,8 @@
   cardModeBtn.addEventListener('click', () => {
     cardMode = true;
     xrayMode = false;
+    abyssMode = false;
+    viewerMaxZoom = 500000;
     faceGuideCircle.classList.add('hidden');
     showScreen(cardSuitScreen);
   });
@@ -602,6 +639,8 @@
     }
     xrayMode = true;
     cardMode = false;
+    abyssMode = false;
+    viewerMaxZoom = 500000;
     cachedWordGrid = null;
     cachedEdgeGrid = null;
     cachedCanvasSnapshot = null;
@@ -611,6 +650,31 @@
 
     // Show face guide circle
     faceGuideCircle.classList.remove('hidden');
+
+    showScreen(cameraScreen);
+    startCamera();
+  });
+
+  // --- Black Abyss Mode ---
+  abyssModeBtn.addEventListener('click', () => {
+    const word = secretInput.value.trim();
+    if (injectEnabled) {
+      if (!secretWord) return;
+    } else {
+      if (word.length === 0) return;
+      secretWord = word.toUpperCase();
+    }
+    abyssMode = true;
+    xrayMode = false;
+    cardMode = false;
+    cachedWordGrid = null;
+    cachedEdgeGrid = null;
+    cachedCanvasSnapshot = null;
+    cachedAbyssWordGrid = null;
+    faceGuideCircle.classList.add('hidden');
+
+    // Use max zoom for abyss
+    viewerMaxZoom = ABYSS_MAX_ZOOM;
 
     showScreen(cameraScreen);
     startCamera();
@@ -982,7 +1046,9 @@
     }
 
     // Overlay reveal — fades in gradually
-    if (xrayMode) {
+    if (abyssMode) {
+      renderAbyssEffect(cw, ch);
+    } else if (xrayMode) {
       renderXrayEffect(drawX, drawY, scale, cw, ch);
     } else if (viewerZoom >= SECRET_REVEAL_THRESHOLD) {
       const opacity = Math.min(1, (viewerZoom - SECRET_REVEAL_THRESHOLD) / (SECRET_FULL_OPACITY_ZOOM - SECRET_REVEAL_THRESHOLD));
@@ -995,6 +1061,116 @@
 
     // Update zoom indicator
     updateZoomIndicator();
+  }
+
+  // --- Black Abyss Rendering ---
+  let cachedAbyssWordGrid = null;
+
+  function renderAbyssEffect(cw, ch) {
+    const zoom = viewerZoom;
+
+    // Phase 1: Gradual fade to black (10,000x — 100,000x)
+    if (zoom >= ABYSS_FADE_START) {
+      const fadeProgress = Math.min(1, (zoom - ABYSS_FADE_START) / (ABYSS_FADE_END - ABYSS_FADE_START));
+      zoomCtx.fillStyle = `rgba(0, 0, 0, ${fadeProgress})`;
+      zoomCtx.fillRect(0, 0, cw, ch);
+    }
+
+    // Phase 2: Layer overlays (100,000x — 1,000,000x)
+    // Only render layers once we're in the black zone
+    if (zoom >= ABYSS_FADE_END) {
+      // Solid black base (ensures fully black behind layers)
+      zoomCtx.fillStyle = '#000';
+      zoomCtx.fillRect(0, 0, cw, ch);
+
+      for (let i = 0; i < ABYSS_LAYER_RANGES.length; i++) {
+        const [start, end] = ABYSS_LAYER_RANGES[i];
+        if (zoom < start || zoom > end) continue;
+
+        const img = abyssLayers[i];
+        if (!img.complete || !img.naturalWidth) continue;
+
+        // Fade in first half, fade out second half
+        const mid = (start + end) / 2;
+        let layerOpacity;
+        if (zoom < mid) {
+          layerOpacity = (zoom - start) / (mid - start);
+        } else {
+          layerOpacity = 1 - (zoom - mid) / (end - mid);
+        }
+
+        // Draw layer centered and covering the canvas
+        zoomCtx.save();
+        zoomCtx.globalAlpha = layerOpacity;
+
+        // Scale layer to cover canvas while maintaining aspect ratio
+        const imgAspect = img.naturalWidth / img.naturalHeight;
+        const canvasAspect = cw / ch;
+        let drawW, drawH;
+        if (canvasAspect > imgAspect) {
+          drawW = cw;
+          drawH = cw / imgAspect;
+        } else {
+          drawH = ch;
+          drawW = ch * imgAspect;
+        }
+        const drawX = (cw - drawW) / 2;
+        const drawY = (ch - drawH) / 2;
+
+        zoomCtx.drawImage(img, drawX, drawY, drawW, drawH);
+        zoomCtx.restore();
+      }
+    }
+
+    // Phase 3: Secret word reveal (1,000,000x+)
+    if (zoom >= ABYSS_WORD_START && secretWord) {
+      // Solid black base behind the word
+      if (zoom >= ABYSS_FADE_END) {
+        zoomCtx.fillStyle = '#000';
+        zoomCtx.fillRect(0, 0, cw, ch);
+      }
+
+      // Build word grid if needed
+      if (!cachedAbyssWordGrid) {
+        cachedAbyssWordGrid = buildWordGrid(secretWord);
+      }
+      if (!cachedAbyssWordGrid || cachedAbyssWordGrid.length === 0) return;
+
+      const wordOpacity = Math.min(1, (zoom - ABYSS_WORD_START) / (ABYSS_WORD_FULL - ABYSS_WORD_START));
+
+      const grid = cachedAbyssWordGrid;
+      const gridH = grid.length;
+      const gridW = grid[0].length;
+
+      // Word grows as you zoom deeper past ABYSS_WORD_START
+      // Start small and grow to fill a good portion of the screen
+      const zoomPastStart = zoom / ABYSS_WORD_START; // 1.0 at start, 2.0 at 2M
+      const minPixelSize = Math.min(cw, ch) / (Math.max(gridW, gridH) * 8);
+      const maxPixelSize = Math.min(cw, ch) / (Math.max(gridW, gridH) * 1.2);
+      const pixelSize = minPixelSize + (maxPixelSize - minPixelSize) * Math.min(1, (zoomPastStart - 1) / 1);
+
+      const totalW = gridW * pixelSize;
+      const totalH = gridH * pixelSize;
+      const offsetX = (cw - totalW) / 2;
+      const offsetY = (ch - totalH) / 2;
+
+      zoomCtx.save();
+      zoomCtx.globalAlpha = wordOpacity;
+
+      for (let row = 0; row < gridH; row++) {
+        for (let col = 0; col < gridW; col++) {
+          if (grid[row][col] !== 1) continue;
+          zoomCtx.fillStyle = '#fff';
+          zoomCtx.fillRect(
+            offsetX + col * pixelSize,
+            offsetY + row * pixelSize,
+            pixelSize,
+            pixelSize
+          );
+        }
+      }
+      zoomCtx.restore();
+    }
   }
 
   function renderPixelGrid(drawX, drawY, scale, cw, ch) {
@@ -2050,6 +2226,9 @@
       cardSuit = '';
       cardValue = '';
       xrayMode = false;
+      abyssMode = false;
+      cachedAbyssWordGrid = null;
+      viewerMaxZoom = 500000;
       faceGuideCircle.classList.add('hidden');
       viewerZoom = 1;
       viewerPanX = 0;
