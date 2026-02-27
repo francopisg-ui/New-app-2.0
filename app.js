@@ -1016,13 +1016,18 @@
     // Determine if we should render pixel grid or normal image
     const pixelSize = scale; // Size of one image pixel on screen
 
-    // In abyss mode, make the photo gradually transparent so the black
-    // canvas shows through — blends naturally with the overlay fade
+    // In abyss mode, make the photo gradually transparent and blurry
+    // so it dissolves into the black canvas
     if (abyssMode && viewerZoom >= ABYSS_FADE_START) {
       const fadeProg = Math.min(1, (viewerZoom - ABYSS_FADE_START) / (ABYSS_FADE_END - ABYSS_FADE_START));
       // Transparency kicks in after the first 15% of the fade range, then eases
       const photoFade = Math.max(0, (fadeProg - 0.15) / 0.85);
       zoomCtx.globalAlpha = 1 - photoFade * photoFade * 0.9;
+      // Progressive blur — starts subtle, reaches max ~12px by end of fade
+      const blurAmount = fadeProg * fadeProg * 12;
+      if (blurAmount > 0.3) {
+        zoomCtx.filter = `blur(${blurAmount}px)`;
+      }
     }
 
     if (pixelSize > 8) {
@@ -1034,8 +1039,9 @@
       zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
     }
 
-    // Reset alpha after drawing photo
+    // Reset alpha and filter after drawing photo
     zoomCtx.globalAlpha = 1;
+    zoomCtx.filter = 'none';
 
     // Overlay reveal — fades in gradually
     if (abyssMode) {
