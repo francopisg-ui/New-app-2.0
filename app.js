@@ -17,7 +17,6 @@
   let cardSuit = '';  // 'spades', 'hearts', 'clubs', 'diamonds'
   let cardValue = ''; // 'A','2'-'10','J','Q','K'
   let cachedCardGrid = null;
-  let cachedCardEdgeGrid = null;
 
   // Inject state
   let injectEnabled = false;
@@ -555,7 +554,7 @@
       cachedWordGrid = null;
       cachedEdgeGrid = null;
       cachedCardGrid = null;
-      cachedCardEdgeGrid = null;
+
       showScreen(cameraScreen);
       startCamera();
     });
@@ -710,7 +709,7 @@
       cachedWordGrid = null;
       cachedEdgeGrid = null;
       cachedCardGrid = null;
-      cachedCardEdgeGrid = null;
+
     };
     capturedImage.src = dataURL;
   }
@@ -1173,54 +1172,8 @@
     const iw = capturedImageData.width;
     const ih = capturedImageData.height;
 
-    // Build card grid and edge-softness map once and cache
     if (!cachedCardGrid) {
       cachedCardGrid = buildCardGrid(cardSuit, cardValue);
-      if (cachedCardGrid && cachedCardGrid.length > 0) {
-        const gh = cachedCardGrid.length;
-        const gw = cachedCardGrid[0].length;
-        cachedCardEdgeGrid = [];
-
-        for (let y = 0; y < gh; y++) {
-          cachedCardEdgeGrid[y] = [];
-          for (let x = 0; x < gw; x++) {
-            if (cachedCardGrid[y][x] !== 1) {
-              cachedCardEdgeGrid[y][x] = 0;
-              continue;
-            }
-            let minDist = Infinity;
-            for (let dy = -3; dy <= 3; dy++) {
-              for (let dx = -3; dx <= 3; dx++) {
-                if (dy === 0 && dx === 0) continue;
-                const ny = y + dy, nx = x + dx;
-                const isOn = (ny >= 0 && ny < gh && nx >= 0 && nx < gw) ? cachedCardGrid[ny][nx] === 1 : false;
-                if (!isOn) {
-                  const dist = Math.sqrt(dy * dy + dx * dx);
-                  if (dist < minDist) minDist = dist;
-                }
-              }
-            }
-            cachedCardEdgeGrid[y][x] = minDist === Infinity ? 1 : minDist;
-          }
-        }
-
-        let maxDist = 0;
-        for (let y = 0; y < gh; y++) {
-          for (let x = 0; x < gw; x++) {
-            if (cachedCardEdgeGrid[y][x] > maxDist) maxDist = cachedCardEdgeGrid[y][x];
-          }
-        }
-        if (maxDist > 0) {
-          for (let y = 0; y < gh; y++) {
-            for (let x = 0; x < gw; x++) {
-              if (cachedCardGrid[y][x] === 1) {
-                const t = cachedCardEdgeGrid[y][x] / maxDist;
-                cachedCardEdgeGrid[y][x] = 0.02 + 0.98 * (t * t);
-              }
-            }
-          }
-        }
-      }
     }
     if (!cachedCardGrid || cachedCardGrid.length === 0) return;
 
@@ -1234,9 +1187,7 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    const SHIFT = 18;
-    const BLEND = 0.50;
-    const DITHER = 0.95;
+    const SHIFT = 80;
     const gap = scale > 20 ? 1 : 0;
 
     function seededRand(x, y) {
@@ -1253,33 +1204,25 @@
           const px = startX + gx;
           const py = startY + gy;
           if (px >= 0 && px < iw && py >= 0 && py < ih) {
-            const rand = seededRand(px, py);
-            const ef = cachedCardEdgeGrid[gy][gx];
-            if (rand > DITHER * ef) continue;
-
             const idx = (py * iw + px) * 4;
             const origR = data[idx];
             const origG = data[idx + 1];
             const origB = data[idx + 2];
             const brightness = (origR + origG + origB) / 3;
 
-            const noise = 0.8 + seededRand(px + 999, py + 777) * 0.4;
-            const shift = Math.round(SHIFT * ef * noise);
+            const noise = 0.9 + seededRand(px, py) * 0.2;
+            const shift = Math.round(SHIFT * noise);
 
-            let sr, sg, sb;
+            let nr, ng, nb;
             if (brightness > 128) {
-              sr = Math.max(0, origR - shift);
-              sg = Math.max(0, origG - shift);
-              sb = Math.max(0, origB - shift);
+              nr = Math.max(0, origR - shift);
+              ng = Math.max(0, origG - shift);
+              nb = Math.max(0, origB - shift);
             } else {
-              sr = Math.min(255, origR + shift);
-              sg = Math.min(255, origG + shift);
-              sb = Math.min(255, origB + shift);
+              nr = Math.min(255, origR + shift);
+              ng = Math.min(255, origG + shift);
+              nb = Math.min(255, origB + shift);
             }
-
-            const nr = Math.round(origR + (sr - origR) * BLEND);
-            const ng = Math.round(origG + (sg - origG) * BLEND);
-            const nb = Math.round(origB + (sb - origB) * BLEND);
 
             zoomCtx.fillStyle = `rgb(${nr},${ng},${nb})`;
             zoomCtx.fillRect(
@@ -1545,7 +1488,7 @@
       cachedWordGrid = null;
       cachedEdgeGrid = null;
       cachedCardGrid = null;
-      cachedCardEdgeGrid = null;
+
       cardMode = false;
       cardSuit = '';
       cardValue = '';
