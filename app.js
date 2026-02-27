@@ -29,9 +29,9 @@
   const ABYSS_FADE_END = 1000;         // Fully black by 1000x — very gradual fade
   const ABYSS_BRAIN_START = 1700;      // Brain appears while stars still fading
   const ABYSS_BRAIN_FULL = 3200;       // Brain fills most of the screen
-  const ABYSS_WORD_START = 3400;       // Word begins appearing inside brain
-  const ABYSS_WORD_FULL = 6500;        // Word fully visible
-  const ABYSS_MAX_ZOOM = 7000;
+  const ABYSS_WORD_START = 5000;       // Word begins appearing deep inside brain
+  const ABYSS_WORD_FULL = 14000;       // Word fully visible
+  const ABYSS_MAX_ZOOM = 15000;
 
   // X-Ray overlay image (loaded from base64 in xray-images.js)
   const brainImg = new Image();
@@ -1291,10 +1291,10 @@
       const minDim = Math.min(cw, ch);
       const fullBrain = minDim * 0.7;
 
-      // Brain keeps growing past full, simulating zoom-in
+      // Brain keeps growing past full, simulating deep zoom-in
       const zoomInProg = Math.min(1, (zoom - ABYSS_WORD_START) / (ABYSS_MAX_ZOOM - ABYSS_WORD_START));
       const zoomEased = 1 - Math.pow(1 - zoomInProg, 2);
-      const brainSize = fullBrain * (1 + zoomEased * 3); // grows to 4x
+      const brainSize = fullBrain * (1 + zoomEased * 6); // grows to 7x
 
       const aspect = brainImg.naturalWidth / brainImg.naturalHeight;
       const bw = aspect >= 1 ? brainSize : brainSize * aspect;
@@ -1372,8 +1372,8 @@
       // Word scale: each grid cell maps to a region of screen pixels
       const wordSizeProg = Math.min(1, (zoom - ABYSS_WORD_START) / (ABYSS_WORD_FULL - ABYSS_WORD_START));
       const wordEased = 1 - Math.pow(1 - wordSizeProg, 2);
-      const tinyCell = minDim * 0.02 / Math.max(gridW, gridH);
-      const fullCell = minDim * 0.5 / Math.max(gridW, gridH);
+      const tinyCell = minDim * 0.01 / Math.max(gridW, gridH);
+      const fullCell = minDim * 0.7 / Math.max(gridW, gridH);
       const cellSize = tinyCell + (fullCell - tinyCell) * wordEased;
 
       const totalW = gridW * cellSize;
