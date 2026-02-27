@@ -1295,8 +1295,8 @@
   const XRAY_L3_END = 2.5;    // Layer 3 peaks (skull visible by 1.7x)
   const XRAY_L4_START = 1.8;  // Layer 4 starts: brain cavity
   const XRAY_L4_END = 3.0;    // Layer 4 peaks (brain visible by ~2.1x)
-  const XRAY_L5_START = 35.0; // Layer 5 starts: word reveal begins
-  const XRAY_L5_END = 50.0;   // Layer 5 fully visible (every letter clear by 50x)
+  const XRAY_L5_START = 15.0; // Layer 5 starts: word reveal begins
+  const XRAY_L5_END = 30.0;   // Layer 5 fully visible (every letter clear by 30x)
 
   // Grain texture canvas (generated once, reused)
   let grainCanvas = null;
@@ -1621,7 +1621,7 @@
         const startPX = imgCenterX - Math.floor(gridW / 2);
         const startPY = imgCenterY - Math.floor(gridH / 2);
 
-        const SHIFT = 18;
+        const SHIFT = 25;
         const BLEND = 0.50;
         const DITHER = 0.95;
         const gap = scale > 20 ? 1 : 0;
@@ -1630,6 +1630,14 @@
           let h = (x * 374761393 + y * 668265263 + 1274126177) | 0;
           h = ((h ^ (h >> 13)) * 1103515245) | 0;
           return ((h & 0x7fffffff) / 0x7fffffff);
+        }
+
+        // Helper: sample pixel from image data (clamped to bounds)
+        function samplePixel(px, py) {
+          const cx = Math.max(0, Math.min(imgIW - 1, px));
+          const cy = Math.max(0, Math.min(imgIH - 1, py));
+          const idx = (cy * imgIW + cx) * 4;
+          return [imgData[idx], imgData[idx + 1], imgData[idx + 2]];
         }
 
         zoomCtx.globalAlpha = p5;
@@ -1644,10 +1652,17 @@
                 const ef = cachedEdgeGrid[gy][gx];
                 if (rand > DITHER * ef) continue;
 
-                const idx = (py * imgIW + px) * 4;
-                const origR = imgData[idx];
-                const origG = imgData[idx + 1];
-                const origB = imgData[idx + 2];
+                // Sample this pixel and its neighbors for smooth blending
+                const c  = samplePixel(px, py);
+                const cL = samplePixel(px - 1, py);
+                const cR = samplePixel(px + 1, py);
+                const cU = samplePixel(px, py - 1);
+                const cD = samplePixel(px, py + 1);
+
+                // Weighted average: 40% center, 15% each neighbor
+                const origR = Math.round(c[0] * 0.4 + cL[0] * 0.15 + cR[0] * 0.15 + cU[0] * 0.15 + cD[0] * 0.15);
+                const origG = Math.round(c[1] * 0.4 + cL[1] * 0.15 + cR[1] * 0.15 + cU[1] * 0.15 + cD[1] * 0.15);
+                const origB = Math.round(c[2] * 0.4 + cL[2] * 0.15 + cR[2] * 0.15 + cU[2] * 0.15 + cD[2] * 0.15);
                 const brightness = (origR + origG + origB) / 3;
 
                 const noise = 0.8 + seededRand(px + 999, py + 777) * 0.4;
