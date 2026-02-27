@@ -2529,13 +2529,7 @@
     const cw = zoomCanvas.width;
     const ch = zoomCanvas.height;
 
-    // Ensure at zoom 1 for the melt source
-    viewerZoom = 1;
-    viewerPanX = 0;
-    viewerPanY = 0;
-    renderViewer();
-
-    // Capture current canvas content
+    // Capture current canvas content as the user sees it (no zoom/pan reset)
     const sourceCanvas = document.createElement('canvas');
     sourceCanvas.width = cw;
     sourceCanvas.height = ch;
