@@ -1421,13 +1421,10 @@
     // ========================================
     // X-RAY FADE-IN: Blue/cyan tint (like an x-ray machine powering on)
     // ========================================
-    // When word is revealing, fade out all earlier effects so they don't bury it
-    const preWordFade = p5 > 0 ? Math.max(0, 1 - p5) : 1;
-
-    if (xrayIntensity > 0 && preWordFade > 0) {
+    if (xrayIntensity > 0) {
       // Subtle blue-cyan tint that grows with x-ray intensity
       zoomCtx.save();
-      const blueAlpha = Math.min(xrayIntensity * 0.08, 0.08) * preWordFade;
+      const blueAlpha = Math.min(xrayIntensity * 0.08, 0.08);
       zoomCtx.globalCompositeOperation = 'multiply';
       zoomCtx.globalAlpha = blueAlpha;
       zoomCtx.fillStyle = '#6090d0';
@@ -1448,7 +1445,7 @@
       }
 
       // Radial vignette centered on face (dark edges, bright center)
-      const vignetteAlpha = Math.min(xrayIntensity * 0.12, 0.12) * preWordFade;
+      const vignetteAlpha = Math.min(xrayIntensity * 0.12, 0.12);
       if (vignetteAlpha > 0.02) {
         const vigRadius = Math.max(cw, ch) * 0.7;
         const grad = zoomCtx.createRadialGradient(
@@ -1469,11 +1466,11 @@
     // LAYER 1: Skin desaturation (1x - 1.3x)
     // Photo goes from color -> desaturated gray
     // ========================================
-    if (p1 > 0 && supportsFilter && preWordFade > 0) {
+    if (p1 > 0 && supportsFilter) {
       zoomCtx.save();
       const desat = Math.round(100 - p1 * 40); // 100% -> 60% (very gentle desaturation)
       const darkAmount = p1 * 0.05;
-      zoomCtx.globalAlpha = p1 * 0.4 * preWordFade;
+      zoomCtx.globalAlpha = p1 * 0.4;
       zoomCtx.filter = 'saturate(' + desat + '%) brightness(' + Math.round(100 - darkAmount * 100) + '%)';
       zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
       zoomCtx.filter = 'none';
@@ -1484,10 +1481,10 @@
     // LAYER 2: Tissue (1.1x - 1.8x)
     // Dark desaturated gray, contrast boost, "under the skin"
     // ========================================
-    if (p2 > 0 && preWordFade > 0) {
+    if (p2 > 0) {
       // Darken overlay (very subtle)
       zoomCtx.save();
-      zoomCtx.globalAlpha = p2 * 0.15 * preWordFade;
+      zoomCtx.globalAlpha = p2 * 0.15;
       zoomCtx.fillStyle = '#060610';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
@@ -1498,7 +1495,7 @@
         const invertAmt = Math.round(p2 * 40);
         const satAmt = Math.round(100 - p2 * 50);
         const contrastAmt = Math.round(100 + p2 * 30);
-        zoomCtx.globalAlpha = p2 * 0.3 * preWordFade;
+        zoomCtx.globalAlpha = p2 * 0.3;
         zoomCtx.filter = 'invert(' + invertAmt + '%) saturate(' + satAmt + '%) contrast(' + contrastAmt + '%) brightness(' + Math.round(100 + p2 * 20) + '%)';
         zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
         zoomCtx.filter = 'none';
@@ -1511,11 +1508,11 @@
     // LAYER 3: Skull (1.5x - 3x)
     // Inverted high-contrast face + drawn skull overlay
     // ========================================
-    if (p3 > 0 && preWordFade > 0) {
+    if (p3 > 0) {
       // X-ray inversion of the photo (subtle, face stays visible)
       if (supportsFilter) {
         zoomCtx.save();
-        zoomCtx.globalAlpha = p3 * 0.3 * preWordFade;
+        zoomCtx.globalAlpha = p3 * 0.3;
         zoomCtx.filter = 'invert(50%) saturate(15%) contrast(130%) brightness(120%)';
         zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
         zoomCtx.filter = 'none';
@@ -1524,7 +1521,7 @@
 
       // Darken non-skull areas (very subtle)
       zoomCtx.save();
-      zoomCtx.globalAlpha = p3 * 0.12 * preWordFade;
+      zoomCtx.globalAlpha = p3 * 0.12;
       zoomCtx.fillStyle = '#000008';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
@@ -1541,10 +1538,10 @@
     // LAYER 4: Brain cavity (2.5x - 4x)
     // Skull fades, dark void, brain shape appears
     // ========================================
-    if (p4 > 0 && preWordFade > 0) {
+    if (p4 > 0) {
       // Darkening for brain cavity (subtle)
       zoomCtx.save();
-      zoomCtx.globalAlpha = p4 * 0.2 * preWordFade;
+      zoomCtx.globalAlpha = p4 * 0.2;
       zoomCtx.fillStyle = '#010108';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
@@ -1577,78 +1574,120 @@
     }
 
     // ========================================
-    // LAYER 5: Word reveal (3.5x - 5x)
-    // Brain fades, word appears in bone-white with halo glow
+    // LAYER 5: Word reveal (pixel-shift, same as normal mode)
+    // Word emerges as subtle color shifts in the image pixels
     // ========================================
-    if (p5 > 0) {
-      // Dark backdrop behind word so it stands out clearly
-      zoomCtx.save();
-      zoomCtx.globalAlpha = p5 * 0.9;
-      zoomCtx.fillStyle = '#0a0a14';
-      zoomCtx.fillRect(0, 0, cw, ch);
-      zoomCtx.restore();
-
-      // Fading brain
-      if (p4 > 0) {
-        const fadingBrain = Math.max(0, 1 - p5);
-        if (fadingBrain > 0) {
-          const brainY = faceScreenY - skullH * 0.15;
-          drawBrainOverlay(zoomCtx, faceScreenX, brainY, brainW, brainH, fadingBrain * p4);
+    if (p5 > 0 && secretWord && capturedImageData) {
+      const wordGrid = cachedWordGrid || (cachedWordGrid = buildWordGrid(secretWord));
+      if (wordGrid && wordGrid.length > 0) {
+        // Build edge grid if not cached
+        if (!cachedEdgeGrid) {
+          const gh = wordGrid.length;
+          const gw = wordGrid[0].length;
+          cachedEdgeGrid = [];
+          for (let y = 0; y < gh; y++) {
+            cachedEdgeGrid[y] = [];
+            for (let x = 0; x < gw; x++) {
+              if (wordGrid[y][x] !== 1) { cachedEdgeGrid[y][x] = 0; continue; }
+              let minDist = Infinity;
+              for (let dy = -3; dy <= 3; dy++) {
+                for (let dx = -3; dx <= 3; dx++) {
+                  if (dy === 0 && dx === 0) continue;
+                  const ny = y + dy, nx = x + dx;
+                  const isLetter = (ny >= 0 && ny < gh && nx >= 0 && nx < gw) ? wordGrid[ny][nx] === 1 : false;
+                  if (!isLetter) { const dist = Math.sqrt(dy * dy + dx * dx); if (dist < minDist) minDist = dist; }
+                }
+              }
+              cachedEdgeGrid[y][x] = minDist === Infinity ? 1 : minDist;
+            }
+          }
+          let maxDist = 0;
+          for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) if (cachedEdgeGrid[y][x] > maxDist) maxDist = cachedEdgeGrid[y][x];
+          if (maxDist > 0) {
+            for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+              if (wordGrid[y][x] === 1) { const t = cachedEdgeGrid[y][x] / maxDist; cachedEdgeGrid[y][x] = 0.02 + 0.98 * (t * t); }
+            }
+          }
         }
-      }
 
-      // Word reveal - crisp canvas text, high contrast
-      if (secretWord) {
-        const wordCenterX = faceScreenX;
-        const wordCenterY = faceScreenY + skullH * 0.05;
+        const gridH = wordGrid.length;
+        const gridW = wordGrid[0].length;
+        const imgIW = capturedImageData.width;
+        const imgIH = capturedImageData.height;
+        const imgData = capturedImageData.data;
 
-        // Font size based on screen width so the whole word always fits in frame
-        // Use canvas width and word length to ensure it never overflows
-        const maxWidth = cw * 0.7; // word should fit within 70% of screen width
-        const fontSize = Math.min(cw * 0.12, maxWidth / (secretWord.length * 0.65));
+        const imgCenterX = wordEmbedPosition ? wordEmbedPosition.x : Math.floor(imgIW / 2);
+        const imgCenterY = wordEmbedPosition ? wordEmbedPosition.y : Math.floor(imgIH / 2);
+        const startPX = imgCenterX - Math.floor(gridW / 2);
+        const startPY = imgCenterY - Math.floor(gridH / 2);
 
-        // Pass 1: strong glow halo behind text
-        zoomCtx.save();
-        zoomCtx.globalAlpha = p5 * 0.8;
-        zoomCtx.font = 'bold ' + Math.round(fontSize) + 'px Arial, Helvetica, sans-serif';
-        zoomCtx.textAlign = 'center';
-        zoomCtx.textBaseline = 'middle';
-        zoomCtx.shadowColor = '#ffffff';
-        zoomCtx.shadowBlur = 40;
-        zoomCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-        zoomCtx.fillText(secretWord.toUpperCase(), wordCenterX, wordCenterY);
-        zoomCtx.fillText(secretWord.toUpperCase(), wordCenterX, wordCenterY);
-        zoomCtx.restore();
+        const SHIFT = 18;
+        const BLEND = 0.50;
+        const DITHER = 0.95;
+        const gap = scale > 20 ? 1 : 0;
 
-        // Pass 2: solid white text, full opacity
-        zoomCtx.save();
+        function seededRand(x, y) {
+          let h = (x * 374761393 + y * 668265263 + 1274126177) | 0;
+          h = ((h ^ (h >> 13)) * 1103515245) | 0;
+          return ((h & 0x7fffffff) / 0x7fffffff);
+        }
+
         zoomCtx.globalAlpha = p5;
-        zoomCtx.font = 'bold ' + Math.round(fontSize) + 'px Arial, Helvetica, sans-serif';
-        zoomCtx.textAlign = 'center';
-        zoomCtx.textBaseline = 'middle';
-        zoomCtx.fillStyle = '#ffffff';
-        zoomCtx.shadowColor = '#ffffff';
-        zoomCtx.shadowBlur = 10;
-        zoomCtx.fillText(secretWord.toUpperCase(), wordCenterX, wordCenterY);
-        zoomCtx.restore();
 
-        // Pass 3: black outline for extra contrast/legibility
-        zoomCtx.save();
-        zoomCtx.globalAlpha = p5 * 0.9;
-        zoomCtx.font = 'bold ' + Math.round(fontSize) + 'px Arial, Helvetica, sans-serif';
-        zoomCtx.textAlign = 'center';
-        zoomCtx.textBaseline = 'middle';
-        zoomCtx.strokeStyle = '#000000';
-        zoomCtx.lineWidth = Math.max(1, fontSize * 0.06);
-        zoomCtx.strokeText(secretWord.toUpperCase(), wordCenterX, wordCenterY);
-        zoomCtx.restore();
+        for (let gy = 0; gy < gridH; gy++) {
+          for (let gx = 0; gx < gridW; gx++) {
+            if (wordGrid[gy][gx] === 1) {
+              const px = startPX + gx;
+              const py = startPY + gy;
+              if (px >= 0 && px < imgIW && py >= 0 && py < imgIH) {
+                const rand = seededRand(px, py);
+                const ef = cachedEdgeGrid[gy][gx];
+                if (rand > DITHER * ef) continue;
+
+                const idx = (py * imgIW + px) * 4;
+                const origR = imgData[idx];
+                const origG = imgData[idx + 1];
+                const origB = imgData[idx + 2];
+                const brightness = (origR + origG + origB) / 3;
+
+                const noise = 0.8 + seededRand(px + 999, py + 777) * 0.4;
+                const shift = Math.round(SHIFT * ef * noise);
+
+                let sr, sg, sb;
+                if (brightness > 128) {
+                  sr = Math.max(0, origR - shift);
+                  sg = Math.max(0, origG - shift);
+                  sb = Math.max(0, origB - shift);
+                } else {
+                  sr = Math.min(255, origR + shift);
+                  sg = Math.min(255, origG + shift);
+                  sb = Math.min(255, origB + shift);
+                }
+
+                const nr = Math.round(origR + (sr - origR) * BLEND);
+                const ng = Math.round(origG + (sg - origG) * BLEND);
+                const nb = Math.round(origB + (sb - origB) * BLEND);
+
+                zoomCtx.fillStyle = 'rgb(' + nr + ',' + ng + ',' + nb + ')';
+                zoomCtx.fillRect(
+                  drawX + px * scale + gap,
+                  drawY + py * scale + gap,
+                  scale - gap * 2,
+                  scale - gap * 2
+                );
+              }
+            }
+          }
+        }
+
+        zoomCtx.globalAlpha = 1;
       }
     }
 
     // ========================================
     // Film grain + scan lines overlay (present from the start)
     // ========================================
-    const grainIntensity = Math.max(p1 * 0.5, p2, p3, p4) * 0.7 * preWordFade;
+    const grainIntensity = Math.max(p1 * 0.5, p2, p3, p4) * 0.7;
     if (grainIntensity > 0.01) {
       // Use a smaller grain canvas for performance, tile it
       const grainW = Math.min(cw, 512);
@@ -1666,8 +1705,8 @@
     }
 
     // Global scan lines from the start (x-ray film look) — fade out during word reveal
-    if (p1 > 0.3 && preWordFade > 0) {
-      drawScanLines(zoomCtx, cw, ch, Math.min(p1, 0.6) * preWordFade);
+    if (p1 > 0.3) {
+      drawScanLines(zoomCtx, cw, ch, Math.min(p1, 0.6));
     }
   }
 
