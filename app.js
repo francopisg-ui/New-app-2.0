@@ -1280,16 +1280,17 @@
   }
 
   // --- X-Ray Effect Rendering (5-Layer System) ---
-  // Layer boundaries (zoom levels for slow 12-15x reveal)
-  const XRAY_L1_END = 2;     // Layer 1 ends: skin desaturation
-  const XRAY_L2_START = 1.5;  // Layer 2 starts: tissue
-  const XRAY_L2_END = 5;     // Layer 2 ends
-  const XRAY_L3_START = 4;   // Layer 3 starts: skull
-  const XRAY_L3_END = 9;     // Layer 3 ends
-  const XRAY_L4_START = 8;   // Layer 4 starts: brain cavity
-  const XRAY_L4_END = 12;    // Layer 4 ends
-  const XRAY_L5_START = 10;  // Layer 5 starts: word reveal
-  const XRAY_L5_END = 15;    // Layer 5 fully visible
+  // Layer boundaries — effect starts immediately at any zoom > 1
+  const XRAY_L1_START = 1.0;  // Layer 1 starts: skin desaturation (instant)
+  const XRAY_L1_END = 1.8;    // Layer 1 peaks
+  const XRAY_L2_START = 1.3;  // Layer 2 starts: tissue
+  const XRAY_L2_END = 3.0;    // Layer 2 peaks
+  const XRAY_L3_START = 2.5;  // Layer 3 starts: skull
+  const XRAY_L3_END = 5.5;    // Layer 3 peaks
+  const XRAY_L4_START = 5.0;  // Layer 4 starts: brain cavity
+  const XRAY_L4_END = 8.0;    // Layer 4 peaks
+  const XRAY_L5_START = 7.0;  // Layer 5 starts: word reveal
+  const XRAY_L5_END = 10.0;   // Layer 5 fully visible
 
   // Grain texture canvas (generated once, reused)
   let grainCanvas = null;
@@ -1529,7 +1530,7 @@
     const brainH = faceSize * 0.45;
 
     // Layer progress values (0-1 each)
-    const p1 = layerProgress(viewerZoom, 1, XRAY_L1_END);         // skin desat
+    const p1 = layerProgress(viewerZoom, XRAY_L1_START, XRAY_L1_END); // skin desat
     const p2 = layerProgress(viewerZoom, XRAY_L2_START, XRAY_L2_END); // tissue
     const p3 = layerProgress(viewerZoom, XRAY_L3_START, XRAY_L3_END); // skull
     const p4 = layerProgress(viewerZoom, XRAY_L4_START, XRAY_L4_END); // brain cavity
@@ -1539,14 +1540,14 @@
     if (p1 <= 0 && p2 <= 0) return;
 
     // ========================================
-    // LAYER 1: Skin desaturation (1x - 2x)
+    // LAYER 1: Skin desaturation (1x - 1.8x)
     // Photo goes from color -> desaturated gray
     // ========================================
     if (p1 > 0 && supportsFilter) {
       zoomCtx.save();
-      const desat = Math.round(100 - p1 * 60); // 100% -> 40%
-      const darkAmount = p1 * 0.15;
-      zoomCtx.globalAlpha = p1 * 0.4;
+      const desat = Math.round(100 - p1 * 80); // 100% -> 20% (stronger desaturation)
+      const darkAmount = p1 * 0.25;
+      zoomCtx.globalAlpha = p1 * 0.7;
       zoomCtx.filter = 'saturate(' + desat + '%) brightness(' + Math.round(100 - darkAmount * 100) + '%)';
       zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
       zoomCtx.filter = 'none';
@@ -1554,13 +1555,13 @@
     }
 
     // ========================================
-    // LAYER 2: Tissue (1.5x - 5x)
+    // LAYER 2: Tissue (1.3x - 3x)
     // Dark desaturated gray, contrast boost, "under the skin"
     // ========================================
     if (p2 > 0) {
       // Darken overlay
       zoomCtx.save();
-      zoomCtx.globalAlpha = p2 * 0.5;
+      zoomCtx.globalAlpha = p2 * 0.65;
       zoomCtx.fillStyle = '#0a0a10';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
@@ -1568,11 +1569,11 @@
       // Re-draw photo inverted and desaturated for tissue look
       if (supportsFilter) {
         zoomCtx.save();
-        const invertAmt = Math.round(p2 * 70);
-        const satAmt = Math.round(100 - p2 * 80);
-        const contrastAmt = Math.round(100 + p2 * 60);
-        zoomCtx.globalAlpha = p2 * 0.5;
-        zoomCtx.filter = 'invert(' + invertAmt + '%) saturate(' + satAmt + '%) contrast(' + contrastAmt + '%) brightness(' + Math.round(100 + p2 * 20) + '%)';
+        const invertAmt = Math.round(p2 * 80);
+        const satAmt = Math.round(100 - p2 * 90);
+        const contrastAmt = Math.round(100 + p2 * 80);
+        zoomCtx.globalAlpha = p2 * 0.65;
+        zoomCtx.filter = 'invert(' + invertAmt + '%) saturate(' + satAmt + '%) contrast(' + contrastAmt + '%) brightness(' + Math.round(100 + p2 * 25) + '%)';
         zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
         zoomCtx.filter = 'none';
         zoomCtx.restore();
@@ -1580,14 +1581,14 @@
     }
 
     // ========================================
-    // LAYER 3: Skull (4x - 9x)
+    // LAYER 3: Skull (2.5x - 5.5x)
     // Inverted high-contrast face + drawn skull overlay
     // ========================================
     if (p3 > 0) {
       // Full x-ray inversion of the photo (white bones on black)
       if (supportsFilter) {
         zoomCtx.save();
-        zoomCtx.globalAlpha = p3 * 0.6;
+        zoomCtx.globalAlpha = p3 * 0.75;
         zoomCtx.filter = 'invert(90%) saturate(5%) contrast(200%) brightness(120%)';
         zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
         zoomCtx.filter = 'none';
@@ -1596,7 +1597,7 @@
 
       // Darken non-skull areas more
       zoomCtx.save();
-      zoomCtx.globalAlpha = p3 * 0.3;
+      zoomCtx.globalAlpha = p3 * 0.4;
       zoomCtx.fillStyle = '#000';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
@@ -1609,7 +1610,7 @@
     }
 
     // ========================================
-    // LAYER 4: Brain cavity (8x - 12x)
+    // LAYER 4: Brain cavity (5x - 8x)
     // Skull fades, dark void, brain shape appears
     // ========================================
     if (p4 > 0) {
@@ -1648,7 +1649,7 @@
     }
 
     // ========================================
-    // LAYER 5: Word reveal (10x - 15x)
+    // LAYER 5: Word reveal (7x - 10x)
     // Brain fades, word appears in bone-white with halo glow
     // ========================================
     if (p5 > 0) {
@@ -1731,7 +1732,7 @@
     // ========================================
     // Film grain overlay (present throughout all x-ray phases)
     // ========================================
-    const grainIntensity = Math.max(p2, p3, p4) * 0.6;
+    const grainIntensity = Math.max(p1 * 0.3, p2, p3, p4) * 0.6;
     if (grainIntensity > 0.01) {
       // Use a smaller grain canvas for performance, tile it
       const grainW = Math.min(cw, 512);
