@@ -394,6 +394,10 @@
   const injectIdInput = document.getElementById('inject-id-input');
   const injectStatus = document.getElementById('inject-status');
 
+  // Gallery upload DOM
+  const galleryBtn = document.getElementById('gallery-btn');
+  const galleryInput = document.getElementById('gallery-input');
+
   // X-Ray mode DOM
   const xrayModeBtn = document.getElementById('xray-mode-btn');
   const faceGuideCircle = document.getElementById('face-guide-circle');
@@ -751,6 +755,47 @@
     };
     capturedImage.src = dataURL;
   }
+
+  // --- Gallery Upload ---
+  galleryBtn.addEventListener('click', () => {
+    galleryInput.click();
+  });
+
+  galleryInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const img = new Image();
+      img.onload = async () => {
+        // Draw uploaded image onto capture canvas (same pipeline as camera)
+        const w = img.width;
+        const h = img.height;
+        captureCanvas.width = w;
+        captureCanvas.height = h;
+        captureCtx.drawImage(img, 0, 0, w, h);
+
+        const dataURL = captureCanvas.toDataURL('image/jpeg', 0.95);
+        capturedImage = new Image();
+        capturedImage.onload = async () => {
+          capturedImageData = captureCtx.getImageData(0, 0, w, h);
+          await detectFaceAndSetPosition();
+          thumbnailPreview.style.backgroundImage = `url(${dataURL})`;
+          thumbnailPreview.classList.add('has-photo');
+          cachedWordGrid = null;
+          cachedEdgeGrid = null;
+          cachedCardGrid = null;
+        };
+        capturedImage.src = dataURL;
+      };
+      img.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+
+    // Reset input so same file can be re-selected
+    galleryInput.value = '';
+  });
 
   // --- Embed Secret Word Into Image Pixels ---
   function embedSecretWord(imgW, imgH) {
