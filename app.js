@@ -12,6 +12,13 @@
   let capturedImage = null; // HTMLImageElement of the captured photo
   let capturedImageData = null; // ImageData of the captured photo
 
+  // Card mode state
+  let cardMode = false;
+  let cardSuit = '';  // 'spades', 'hearts', 'clubs', 'diamonds'
+  let cardValue = ''; // 'A','2'-'10','J','Q','K'
+  let cachedCardGrid = null;
+  let cachedCardEdgeGrid = null;
+
   // Inject state
   let injectEnabled = false;
   let injectId = '';
@@ -385,6 +392,16 @@
   const injectIdInput = document.getElementById('inject-id-input');
   const injectStatus = document.getElementById('inject-status');
 
+  // Card mode DOM
+  const cardModeBtn = document.getElementById('card-mode-btn');
+  const cardSuitScreen = document.getElementById('card-suit-screen');
+  const cardValueScreen = document.getElementById('card-value-screen');
+  const cardValuePrompt = document.getElementById('card-value-prompt');
+  const suitBtns = document.querySelectorAll('.suit-btn');
+  const valueBtns = document.querySelectorAll('.value-btn');
+  const cardBackToMain = document.getElementById('card-back-to-main');
+  const cardBackToSuit = document.getElementById('card-back-to-suit');
+
   // --- Screen Management ---
   function showScreen(screen) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -514,6 +531,47 @@
       injectStatus.classList.remove('connected');
     }
   }
+
+  // --- Card Mode ---
+  const SUIT_SYMBOLS = { spades: '\u2660', hearts: '\u2665', clubs: '\u2663', diamonds: '\u2666' };
+
+  cardModeBtn.addEventListener('click', () => {
+    cardMode = true;
+    showScreen(cardSuitScreen);
+  });
+
+  suitBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      cardSuit = btn.dataset.suit;
+      cardValuePrompt.textContent = SUIT_SYMBOLS[cardSuit] + ' Select Value';
+      showScreen(cardValueScreen);
+    });
+  });
+
+  valueBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      cardValue = btn.dataset.value;
+      secretWord = cardValue + SUIT_SYMBOLS[cardSuit];
+      cachedWordGrid = null;
+      cachedEdgeGrid = null;
+      cachedCardGrid = null;
+      cachedCardEdgeGrid = null;
+      showScreen(cameraScreen);
+      startCamera();
+    });
+  });
+
+  cardBackToMain.addEventListener('click', () => {
+    cardMode = false;
+    cardSuit = '';
+    cardValue = '';
+    showScreen(secretScreen);
+  });
+
+  cardBackToSuit.addEventListener('click', () => {
+    cardValue = '';
+    showScreen(cardSuitScreen);
+  });
 
   // --- Camera ---
   async function startCamera() {
@@ -843,10 +901,14 @@
       zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
     }
 
-    // Overlay secret word — fades in gradually, always at viewport center
+    // Overlay reveal — fades in gradually
     if (viewerZoom >= SECRET_REVEAL_THRESHOLD) {
       const opacity = Math.min(1, (viewerZoom - SECRET_REVEAL_THRESHOLD) / (SECRET_FULL_OPACITY_ZOOM - SECRET_REVEAL_THRESHOLD));
-      renderSecretOverlay(drawX, drawY, scale, cw, ch, opacity);
+      if (cardMode) {
+        renderCardOverlay(drawX, drawY, scale, cw, ch, opacity);
+      } else {
+        renderSecretOverlay(drawX, drawY, scale, cw, ch, opacity);
+      }
     }
 
     // Update zoom indicator
@@ -1015,6 +1077,315 @@
             const nb = Math.round(origB + (sb - origB) * BLEND);
 
             zoomCtx.fillStyle = `rgb(${nr},${ng},${nb})`;
+            zoomCtx.fillRect(
+              drawX + px * scale + gap,
+              drawY + py * scale + gap,
+              scale - gap * 2,
+              scale - gap * 2
+            );
+          }
+        }
+      }
+    }
+
+    zoomCtx.globalAlpha = 1;
+  }
+
+  // --- Card Pixel Art ---
+  // Grid cells: 0=transparent, 1=white(card bg), 2=black(ink), 3=suit-color(ink)
+  // Card is 21 wide x 31 tall image pixels
+
+  const CARD_W = 21;
+  const CARD_H = 31;
+
+  // Mini 3x5 font for corner values
+  const MINI_FONT = {
+    'A': [[0,1,0],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
+    '2': [[1,1,0],[0,0,1],[0,1,0],[1,0,0],[1,1,1]],
+    '3': [[1,1,0],[0,0,1],[0,1,0],[0,0,1],[1,1,0]],
+    '4': [[1,0,1],[1,0,1],[1,1,1],[0,0,1],[0,0,1]],
+    '5': [[1,1,1],[1,0,0],[1,1,0],[0,0,1],[1,1,0]],
+    '6': [[0,1,1],[1,0,0],[1,1,0],[1,0,1],[0,1,0]],
+    '7': [[1,1,1],[0,0,1],[0,1,0],[0,1,0],[0,1,0]],
+    '8': [[0,1,0],[1,0,1],[0,1,0],[1,0,1],[0,1,0]],
+    '9': [[0,1,0],[1,0,1],[0,1,1],[0,0,1],[1,1,0]],
+    '10':[[1,0,1,0],[1,0,1,1],[1,0,1,1],[1,0,1,1],[1,0,1,0]],
+    'J': [[0,1,1],[0,0,1],[0,0,1],[1,0,1],[0,1,0]],
+    'Q': [[0,1,0],[1,0,1],[1,0,1],[0,1,0],[0,0,1]],
+    'K': [[1,0,1],[1,1,0],[1,0,0],[1,1,0],[1,0,1]]
+  };
+
+  // 3x3 mini suit symbols for corners
+  const MINI_SUITS = {
+    spades:   [[0,1,0],[1,1,1],[0,1,0]],
+    hearts:   [[1,0,1],[1,1,1],[0,1,0]],
+    clubs:    [[0,1,0],[1,1,1],[0,1,0]],
+    diamonds: [[0,1,0],[1,1,1],[0,1,0]]
+  };
+
+  // 5x5 suit pips for card body
+  const SUIT_PIPS = {
+    spades: [
+      [0,0,1,0,0],
+      [0,1,1,1,0],
+      [1,1,1,1,1],
+      [0,0,1,0,0],
+      [0,1,0,1,0]
+    ],
+    hearts: [
+      [0,1,0,1,0],
+      [1,1,1,1,1],
+      [1,1,1,1,1],
+      [0,1,1,1,0],
+      [0,0,1,0,0]
+    ],
+    clubs: [
+      [0,0,1,0,0],
+      [0,1,1,1,0],
+      [1,1,0,1,1],
+      [0,1,1,1,0],
+      [0,0,1,0,0]
+    ],
+    diamonds: [
+      [0,0,1,0,0],
+      [0,1,1,1,0],
+      [1,1,1,1,1],
+      [0,1,1,1,0],
+      [0,0,1,0,0]
+    ]
+  };
+
+  // 7x9 face figures for J, Q, K
+  const FACE_FIGURES = {
+    'J': [
+      [0,0,1,1,1,0,0],
+      [0,1,0,1,0,1,0],
+      [0,0,0,1,0,0,0],
+      [0,1,1,1,1,1,0],
+      [0,0,1,1,1,0,0],
+      [0,0,1,0,1,0,0],
+      [0,0,1,0,1,0,0],
+      [0,1,1,0,1,1,0],
+      [0,1,1,1,1,1,0]
+    ],
+    'Q': [
+      [0,0,1,1,1,0,0],
+      [0,1,0,1,0,1,0],
+      [0,0,0,1,0,0,0],
+      [0,1,1,1,1,1,0],
+      [1,1,1,1,1,1,1],
+      [0,1,1,0,1,1,0],
+      [0,0,1,0,1,0,0],
+      [0,1,0,0,0,1,0],
+      [0,1,1,1,1,1,0]
+    ],
+    'K': [
+      [0,1,1,1,1,1,0],
+      [0,1,0,1,0,1,0],
+      [0,0,0,1,0,0,0],
+      [1,1,1,1,1,1,1],
+      [0,1,1,1,1,1,0],
+      [0,0,1,0,1,0,0],
+      [0,0,1,0,1,0,0],
+      [0,1,1,0,1,1,0],
+      [0,1,1,1,1,1,0]
+    ]
+  };
+
+  // Pip layout positions for number cards (row, col offsets from card center area)
+  // Card body area is cols 3-17, rows 7-23 (15w x 17h)
+  // Positions defined as [row, col] within body area center (7.5, 7.5)
+  function getPipPositions(value) {
+    // Positions relative to center of body (8, 7.5), half-body is 8.5 rows, 7.5 cols
+    // Expressed as fractions of half-body then mapped to actual positions
+    const layouts = {
+      'A': [[0, 0]],
+      '2': [[-1, 0], [1, 0]],
+      '3': [[-1, 0], [0, 0], [1, 0]],
+      '4': [[-1, -1], [-1, 1], [1, -1], [1, 1]],
+      '5': [[-1, -1], [-1, 1], [0, 0], [1, -1], [1, 1]],
+      '6': [[-1, -1], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 1]],
+      '7': [[-1, -1], [-1, 1], [-0.5, 0], [0, -1], [0, 1], [1, -1], [1, 1]],
+      '8': [[-1, -1], [-1, 1], [-0.5, 0], [0, -1], [0, 1], [0.5, 0], [1, -1], [1, 1]],
+      '9': [[-1, -1], [-1, 1], [-0.5, -1], [-0.5, 1], [0, 0], [0.5, -1], [0.5, 1], [1, -1], [1, 1]],
+      '10': [[-1, -1], [-1, 1], [-0.67, 0], [-0.33, -1], [-0.33, 1], [0.33, -1], [0.33, 1], [0.67, 0], [1, -1], [1, 1]]
+    };
+    return layouts[value] || [];
+  }
+
+  function buildCardGrid(suit, value) {
+    // Create 21x31 grid, fill with 0 (transparent)
+    const grid = [];
+    for (let y = 0; y < CARD_H; y++) {
+      grid[y] = new Array(CARD_W).fill(0);
+    }
+
+    // Fill card background (white = 1), with 1px rounded corners
+    for (let y = 1; y < CARD_H - 1; y++) {
+      for (let x = 1; x < CARD_W - 1; x++) {
+        grid[y][x] = 1;
+      }
+    }
+    // Top/bottom edges (skip corners for rounding)
+    for (let x = 2; x < CARD_W - 2; x++) {
+      grid[0][x] = 1;
+      grid[CARD_H - 1][x] = 1;
+    }
+
+    const isRed = (suit === 'hearts' || suit === 'diamonds');
+    const inkColor = isRed ? 3 : 2; // 3=red, 2=black
+
+    // --- Corner value (top-left) ---
+    const valGlyph = MINI_FONT[value];
+    const vw = valGlyph[0].length;
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < vw; c++) {
+        if (valGlyph[r][c]) grid[2 + r][2 + c] = inkColor;
+      }
+    }
+
+    // --- Corner suit pip (top-left, below value) ---
+    const miniSuit = MINI_SUITS[suit];
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        if (miniSuit[r][c]) grid[8 + r][2 + c] = inkColor;
+      }
+    }
+
+    // --- Bottom-right corner (rotated 180) ---
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < vw; c++) {
+        if (valGlyph[r][c]) grid[CARD_H - 3 - r][CARD_W - 3 - c] = inkColor;
+      }
+    }
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        if (miniSuit[r][c]) grid[CARD_H - 9 - r][CARD_W - 3 - c] = inkColor;
+      }
+    }
+
+    // --- Card border ---
+    for (let y = 0; y < CARD_H; y++) {
+      for (let x = 0; x < CARD_W; x++) {
+        if (grid[y][x] === 1) {
+          // Check if edge of card
+          let isEdge = false;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              const ny = y + dy, nx = x + dx;
+              if (ny < 0 || ny >= CARD_H || nx < 0 || nx >= CARD_W || grid[ny][nx] === 0) {
+                isEdge = true;
+              }
+            }
+          }
+          if (isEdge && grid[y][x] === 1) grid[y][x] = 4; // 4 = border gray
+        }
+      }
+    }
+
+    // --- Center body: pips or face figure ---
+    const pip = SUIT_PIPS[suit];
+    const bodyTop = 8;
+    const bodyBot = CARD_H - 9;
+    const bodyLeft = 6;
+    const bodyRight = CARD_W - 7;
+    const bodyCenterX = Math.floor((bodyLeft + bodyRight) / 2);
+    const bodyCenterY = Math.floor((bodyTop + bodyBot) / 2);
+    const bodyHalfH = (bodyBot - bodyTop) / 2;
+    const bodyHalfW = (bodyRight - bodyLeft) / 2;
+
+    if (value === 'J' || value === 'Q' || value === 'K') {
+      // Draw face figure centered in body
+      const fig = FACE_FIGURES[value];
+      const fh = fig.length;
+      const fw = fig[0].length;
+      const startY = bodyCenterY - Math.floor(fh / 2);
+      const startX = bodyCenterX - Math.floor(fw / 2);
+      for (let r = 0; r < fh; r++) {
+        for (let c = 0; c < fw; c++) {
+          if (fig[r][c]) {
+            const gy = startY + r;
+            const gx = startX + c;
+            if (gy >= 0 && gy < CARD_H && gx >= 0 && gx < CARD_W) {
+              grid[gy][gx] = inkColor;
+            }
+          }
+        }
+      }
+      // Add small suit pip above and below figure
+      const pipAboveY = startY - 4;
+      const pipBelowY = startY + fh + 1;
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+          if (miniSuit[r][c]) {
+            if (pipAboveY + r >= 0) grid[pipAboveY + r][bodyCenterX - 1 + c] = inkColor;
+            if (pipBelowY + r < CARD_H) grid[pipBelowY + r][bodyCenterX - 1 + c] = inkColor;
+          }
+        }
+      }
+    } else {
+      // Number card: place pips
+      const positions = getPipPositions(value);
+      for (const [pRow, pCol] of positions) {
+        const py = Math.round(bodyCenterY + pRow * bodyHalfH * 0.75);
+        const px = Math.round(bodyCenterX + pCol * bodyHalfW * 0.7);
+        // Place 5x5 pip centered at (py, px)
+        for (let r = 0; r < 5; r++) {
+          for (let c = 0; c < 5; c++) {
+            if (pip[r][c]) {
+              const gy = py - 2 + r;
+              const gx = px - 2 + c;
+              if (gy >= 1 && gy < CARD_H - 1 && gx >= 1 && gx < CARD_W - 1) {
+                grid[gy][gx] = inkColor;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return grid;
+  }
+
+  function renderCardOverlay(drawX, drawY, scale, cw, ch, opacity) {
+    if (!cardMode || !cardSuit || !cardValue || !capturedImageData) return;
+
+    const iw = capturedImageData.width;
+    const ih = capturedImageData.height;
+
+    if (!cachedCardGrid) {
+      cachedCardGrid = buildCardGrid(cardSuit, cardValue);
+    }
+
+    const gridH = cachedCardGrid.length;
+    const gridW = cachedCardGrid[0].length;
+
+    const imgCenterX = wordEmbedPosition ? wordEmbedPosition.x : Math.floor(iw / 2);
+    const imgCenterY = wordEmbedPosition ? wordEmbedPosition.y : Math.floor(ih / 2);
+
+    const startX = imgCenterX - Math.floor(gridW / 2);
+    const startY = imgCenterY - Math.floor(gridH / 2);
+
+    const gap = scale > 20 ? 1 : 0;
+    const isRed = (cardSuit === 'hearts' || cardSuit === 'diamonds');
+
+    zoomCtx.globalAlpha = opacity;
+
+    const COLOR_MAP = {
+      1: '#FFFFFF',       // card background
+      2: '#1a1a1a',       // black ink
+      3: isRed ? '#D40000' : '#1a1a1a', // suit color
+      4: '#AAAAAA'        // border
+    };
+
+    for (let gy = 0; gy < gridH; gy++) {
+      for (let gx = 0; gx < gridW; gx++) {
+        const cell = cachedCardGrid[gy][gx];
+        if (cell > 0) {
+          const px = startX + gx;
+          const py = startY + gy;
+          if (px >= 0 && px < iw && py >= 0 && py < ih) {
+            zoomCtx.fillStyle = COLOR_MAP[cell];
             zoomCtx.fillRect(
               drawX + px * scale + gap,
               drawY + py * scale + gap,
@@ -1277,6 +1648,11 @@
       capturedImageData = null;
       cachedWordGrid = null;
       cachedEdgeGrid = null;
+      cachedCardGrid = null;
+      cachedCardEdgeGrid = null;
+      cardMode = false;
+      cardSuit = '';
+      cardValue = '';
       viewerZoom = 1;
       viewerPanX = 0;
       viewerPanY = 0;
@@ -1321,34 +1697,74 @@
     const sourceCtx = sourceCanvas.getContext('2d');
     sourceCtx.drawImage(zoomCanvas, 0, 0);
 
-    // Build word mask using canvas text
+    // Build mask and word layer
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = cw;
     maskCanvas.height = ch;
     const maskCtx = maskCanvas.getContext('2d');
-    let fontSize = Math.min(cw * 0.12, ch * 0.15);
-    maskCtx.font = '900 ' + fontSize + 'px -apple-system, BlinkMacSystemFont, sans-serif';
-    let metrics = maskCtx.measureText(secretWord);
-    if (metrics.width > cw * 0.85) {
-      fontSize *= (cw * 0.85) / metrics.width;
-      maskCtx.font = '900 ' + fontSize + 'px -apple-system, BlinkMacSystemFont, sans-serif';
-    }
-    maskCtx.textAlign = 'center';
-    maskCtx.textBaseline = 'middle';
-    maskCtx.fillStyle = '#fff';
-    maskCtx.fillText(secretWord, cw / 2, ch / 2);
 
-    // Word portion: photo pixels masked to word shape
     const wordCanvas = document.createElement('canvas');
     wordCanvas.width = cw;
     wordCanvas.height = ch;
     const wordCtx = wordCanvas.getContext('2d');
-    wordCtx.drawImage(maskCanvas, 0, 0);
-    wordCtx.globalCompositeOperation = 'source-in';
-    wordCtx.drawImage(sourceCanvas, 0, 0);
-    wordCtx.globalCompositeOperation = 'source-over';
 
-    // Melt portion: photo with word area cut out
+    if (cardMode && cardSuit && cardValue) {
+      // Card mode: draw the full card as the reveal image
+      const cardGrid = cachedCardGrid || buildCardGrid(cardSuit, cardValue);
+      const isRed = (cardSuit === 'hearts' || cardSuit === 'diamonds');
+      const COLOR_MAP = {
+        1: '#FFFFFF', 2: '#1a1a1a',
+        3: isRed ? '#D40000' : '#1a1a1a', 4: '#AAAAAA'
+      };
+      // Scale card to fill ~80% of the screen height
+      const cardScale = Math.floor(ch * 0.8 / CARD_H);
+      const cardPxW = CARD_W * cardScale;
+      const cardPxH = CARD_H * cardScale;
+      const cardOffX = Math.floor((cw - cardPxW) / 2);
+      const cardOffY = Math.floor((ch - cardPxH) / 2);
+
+      // Draw card onto wordCanvas directly (full color card)
+      for (let gy = 0; gy < CARD_H; gy++) {
+        for (let gx = 0; gx < CARD_W; gx++) {
+          const cell = cardGrid[gy][gx];
+          if (cell > 0) {
+            wordCtx.fillStyle = COLOR_MAP[cell];
+            wordCtx.fillRect(cardOffX + gx * cardScale, cardOffY + gy * cardScale, cardScale, cardScale);
+          }
+        }
+      }
+
+      // Build mask as the card silhouette (for melt cutout)
+      maskCtx.fillStyle = '#fff';
+      for (let gy = 0; gy < CARD_H; gy++) {
+        for (let gx = 0; gx < CARD_W; gx++) {
+          if (cardGrid[gy][gx] > 0) {
+            maskCtx.fillRect(cardOffX + gx * cardScale, cardOffY + gy * cardScale, cardScale, cardScale);
+          }
+        }
+      }
+    } else {
+      // Word mode: text mask
+      let fontSize = Math.min(cw * 0.12, ch * 0.15);
+      maskCtx.font = '900 ' + fontSize + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+      let metrics = maskCtx.measureText(secretWord);
+      if (metrics.width > cw * 0.85) {
+        fontSize *= (cw * 0.85) / metrics.width;
+        maskCtx.font = '900 ' + fontSize + 'px -apple-system, BlinkMacSystemFont, sans-serif';
+      }
+      maskCtx.textAlign = 'center';
+      maskCtx.textBaseline = 'middle';
+      maskCtx.fillStyle = '#fff';
+      maskCtx.fillText(secretWord, cw / 2, ch / 2);
+
+      // Word portion: photo pixels masked to word shape
+      wordCtx.drawImage(maskCanvas, 0, 0);
+      wordCtx.globalCompositeOperation = 'source-in';
+      wordCtx.drawImage(sourceCanvas, 0, 0);
+      wordCtx.globalCompositeOperation = 'source-over';
+    }
+
+    // Melt portion: photo with reveal area cut out
     const meltSourceCanvas = document.createElement('canvas');
     meltSourceCanvas.width = cw;
     meltSourceCanvas.height = ch;

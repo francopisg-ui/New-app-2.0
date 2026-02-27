@@ -157,6 +157,83 @@ html, body {
   display: none !important;
 }
 
+/* ========== CARD MODE ========== */
+.mode-divider {
+  width: 60%;
+  height: 1px;
+  background: #333;
+  margin: 4px 0;
+}
+
+.card-mode-btn {
+  background: #1c1c1e !important;
+  border: 1px solid #444 !important;
+  font-size: 15px !important;
+}
+
+.card-mode-btn:active {
+  opacity: 0.7;
+}
+
+#card-suit-screen,
+#card-value-screen {
+  background: #000;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+.card-btn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.card-value-grid {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.card-select-btn {
+  padding: 16px 10px;
+  font-size: 18px;
+  font-weight: 600;
+  background: #1c1c1e;
+  border: 1px solid #333;
+  border-radius: 12px;
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.card-select-btn:active {
+  background: #0a84ff;
+}
+
+.suit-btn[data-suit="hearts"],
+.suit-btn[data-suit="diamonds"] {
+  color: #ff3b30;
+}
+
+.card-back-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  background: none;
+  color: #0a84ff;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  margin-top: 4px;
+}
+
+.card-back-btn:active {
+  opacity: 0.5;
+}
+
 /* ========== CAMERA SCREEN ========== */
 #camera-screen {
   background: #000;

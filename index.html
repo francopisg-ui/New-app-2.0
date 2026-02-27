@@ -30,6 +30,45 @@
       <div class="inject-status hidden" id="inject-status"></div>
 
       <button id="secret-submit" class="secret-submit">Continue</button>
+      <div class="mode-divider"></div>
+      <button id="card-mode-btn" class="secret-submit card-mode-btn">Card Mode</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 1b: Card Mode - Suit Selection -->
+  <div id="card-suit-screen" class="screen">
+    <div class="secret-container">
+      <div class="secret-prompt">Select Suit</div>
+      <div class="card-btn-grid">
+        <button class="card-select-btn suit-btn" data-suit="spades">&#9824; Spades</button>
+        <button class="card-select-btn suit-btn" data-suit="hearts">&#9829; Hearts</button>
+        <button class="card-select-btn suit-btn" data-suit="clubs">&#9827; Clubs</button>
+        <button class="card-select-btn suit-btn" data-suit="diamonds">&#9830; Diamonds</button>
+      </div>
+      <button id="card-back-to-main" class="card-back-btn">Back</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 1c: Card Mode - Value Selection -->
+  <div id="card-value-screen" class="screen">
+    <div class="secret-container">
+      <div class="secret-prompt" id="card-value-prompt">Select Value</div>
+      <div class="card-btn-grid card-value-grid">
+        <button class="card-select-btn value-btn" data-value="A">A</button>
+        <button class="card-select-btn value-btn" data-value="2">2</button>
+        <button class="card-select-btn value-btn" data-value="3">3</button>
+        <button class="card-select-btn value-btn" data-value="4">4</button>
+        <button class="card-select-btn value-btn" data-value="5">5</button>
+        <button class="card-select-btn value-btn" data-value="6">6</button>
+        <button class="card-select-btn value-btn" data-value="7">7</button>
+        <button class="card-select-btn value-btn" data-value="8">8</button>
+        <button class="card-select-btn value-btn" data-value="9">9</button>
+        <button class="card-select-btn value-btn" data-value="10">10</button>
+        <button class="card-select-btn value-btn" data-value="J">J</button>
+        <button class="card-select-btn value-btn" data-value="Q">Q</button>
+        <button class="card-select-btn value-btn" data-value="K">K</button>
+      </div>
+      <button id="card-back-to-suit" class="card-back-btn">Back</button>
     </div>
   </div>
 
