@@ -1279,113 +1279,474 @@
     zoomCtx.globalAlpha = 1;
   }
 
-  // --- X-Ray Effect Rendering ---
-  // Thresholds for x-ray progression
-  const XRAY_START_ZOOM = 1.5;   // x-ray tint begins
-  const XRAY_WORD_ZOOM = 4;      // word starts appearing
-  const XRAY_FULL_ZOOM = 12;     // full transparency, word fully visible
+  // --- X-Ray Effect Rendering (5-Layer System) ---
+  // Layer boundaries (zoom levels for slow 12-15x reveal)
+  const XRAY_L1_END = 2;     // Layer 1 ends: skin desaturation
+  const XRAY_L2_START = 1.5;  // Layer 2 starts: tissue
+  const XRAY_L2_END = 5;     // Layer 2 ends
+  const XRAY_L3_START = 4;   // Layer 3 starts: skull
+  const XRAY_L3_END = 9;     // Layer 3 ends
+  const XRAY_L4_START = 8;   // Layer 4 starts: brain cavity
+  const XRAY_L4_END = 12;    // Layer 4 ends
+  const XRAY_L5_START = 10;  // Layer 5 starts: word reveal
+  const XRAY_L5_END = 15;    // Layer 5 fully visible
+
+  // Grain texture canvas (generated once, reused)
+  let grainCanvas = null;
+  let grainSeed = 0;
+
+  function getGrainCanvas(w, h) {
+    if (!grainCanvas || grainCanvas.width !== w || grainCanvas.height !== h) {
+      grainCanvas = document.createElement('canvas');
+      grainCanvas.width = w;
+      grainCanvas.height = h;
+    }
+    // Regenerate grain pattern periodically for subtle animation
+    const now = Date.now();
+    if (now - grainSeed > 100) {
+      grainSeed = now;
+      const ctx = grainCanvas.getContext('2d');
+      const imgData = ctx.createImageData(w, h);
+      const d = imgData.data;
+      // Sparse grain: only set ~8% of pixels for performance
+      const step = 4; // check every 4th pixel
+      for (let i = 0; i < d.length; i += 4 * step) {
+        const v = Math.random() * 255;
+        d[i] = v;
+        d[i + 1] = v;
+        d[i + 2] = v;
+        d[i + 3] = Math.random() < 0.08 ? Math.floor(Math.random() * 80) : 0;
+      }
+      ctx.putImageData(imgData, 0, 0);
+    }
+    return grainCanvas;
+  }
+
+  function layerProgress(zoom, start, end) {
+    if (zoom <= start) return 0;
+    if (zoom >= end) return 1;
+    return (zoom - start) / (end - start);
+  }
+
+  // --- Draw skull outline (Canvas 2D paths, face-tracked) ---
+  function drawSkullOverlay(ctx, cx, cy, skullW, skullH, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(cx, cy);
+
+    // Scale factors
+    const sw = skullW / 2;
+    const sh = skullH / 2;
+
+    // --- Cranium (dome) ---
+    ctx.beginPath();
+    ctx.moveTo(-sw * 0.75, sh * 0.1);
+    ctx.bezierCurveTo(-sw * 0.85, -sh * 0.3, -sw * 0.7, -sh * 0.85, 0, -sh * 0.95);
+    ctx.bezierCurveTo(sw * 0.7, -sh * 0.85, sw * 0.85, -sh * 0.3, sw * 0.75, sh * 0.1);
+    // Cheekbones down to jaw
+    ctx.bezierCurveTo(sw * 0.8, sh * 0.25, sw * 0.65, sh * 0.45, sw * 0.4, sh * 0.7);
+    ctx.bezierCurveTo(sw * 0.3, sh * 0.85, sw * 0.15, sh * 0.95, 0, sh);
+    ctx.bezierCurveTo(-sw * 0.15, sh * 0.95, -sw * 0.3, sh * 0.85, -sw * 0.4, sh * 0.7);
+    ctx.bezierCurveTo(-sw * 0.65, sh * 0.45, -sw * 0.8, sh * 0.25, -sw * 0.75, sh * 0.1);
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(220, 230, 240, ' + (alpha * 0.7) + ')';
+    ctx.lineWidth = Math.max(1, skullW * 0.008);
+    ctx.stroke();
+    // Faint fill
+    ctx.fillStyle = 'rgba(200, 215, 230, ' + (alpha * 0.06) + ')';
+    ctx.fill();
+
+    // --- Eye sockets ---
+    for (let side = -1; side <= 1; side += 2) {
+      ctx.beginPath();
+      const ex = side * sw * 0.32;
+      const ey = -sh * 0.05;
+      const erx = sw * 0.2;
+      const ery = sh * 0.15;
+      ctx.ellipse(ex, ey, erx, ery, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, ' + (alpha * 0.8) + ')';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(200, 215, 230, ' + (alpha * 0.5) + ')';
+      ctx.lineWidth = Math.max(1, skullW * 0.006);
+      ctx.stroke();
+    }
+
+    // --- Nasal cavity ---
+    ctx.beginPath();
+    ctx.moveTo(0, sh * 0.08);
+    ctx.lineTo(-sw * 0.08, sh * 0.3);
+    ctx.bezierCurveTo(-sw * 0.06, sh * 0.35, sw * 0.06, sh * 0.35, sw * 0.08, sh * 0.3);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0, 0, 0, ' + (alpha * 0.7) + ')';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 215, 230, ' + (alpha * 0.4) + ')';
+    ctx.lineWidth = Math.max(1, skullW * 0.004);
+    ctx.stroke();
+
+    // --- Teeth (upper row) ---
+    const teethY = sh * 0.5;
+    const teethCount = 8;
+    const toothW = sw * 0.1;
+    const toothH = sh * 0.1;
+    const teethStartX = -(teethCount * toothW) / 2;
+    ctx.fillStyle = 'rgba(220, 225, 230, ' + (alpha * 0.5) + ')';
+    ctx.strokeStyle = 'rgba(180, 190, 200, ' + (alpha * 0.3) + ')';
+    ctx.lineWidth = Math.max(0.5, skullW * 0.003);
+    for (let i = 0; i < teethCount; i++) {
+      const tx = teethStartX + i * toothW + toothW * 0.1;
+      ctx.fillRect(tx, teethY, toothW * 0.8, toothH);
+      ctx.strokeRect(tx, teethY, toothW * 0.8, toothH);
+    }
+
+    // --- Lower teeth ---
+    const lowerTeethY = teethY + toothH + sh * 0.02;
+    for (let i = 0; i < teethCount; i++) {
+      const tx = teethStartX + i * toothW + toothW * 0.1;
+      ctx.fillRect(tx, lowerTeethY, toothW * 0.8, toothH * 0.9);
+      ctx.strokeRect(tx, lowerTeethY, toothW * 0.8, toothH * 0.9);
+    }
+
+    // --- Temporal bone lines ---
+    ctx.strokeStyle = 'rgba(200, 215, 230, ' + (alpha * 0.2) + ')';
+    ctx.lineWidth = Math.max(0.5, skullW * 0.003);
+    for (let side = -1; side <= 1; side += 2) {
+      ctx.beginPath();
+      ctx.moveTo(side * sw * 0.6, -sh * 0.5);
+      ctx.bezierCurveTo(side * sw * 0.65, -sh * 0.2, side * sw * 0.55, sh * 0.1, side * sw * 0.5, sh * 0.3);
+      ctx.stroke();
+    }
+
+    // --- Brow ridge ---
+    ctx.beginPath();
+    ctx.moveTo(-sw * 0.55, -sh * 0.15);
+    ctx.bezierCurveTo(-sw * 0.3, -sh * 0.22, sw * 0.3, -sh * 0.22, sw * 0.55, -sh * 0.15);
+    ctx.strokeStyle = 'rgba(200, 215, 230, ' + (alpha * 0.35) + ')';
+    ctx.lineWidth = Math.max(1, skullW * 0.005);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // --- Draw brain shape (Canvas 2D paths) ---
+  function drawBrainOverlay(ctx, cx, cy, brainW, brainH, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(cx, cy);
+
+    const bw = brainW / 2;
+    const bh = brainH / 2;
+
+    // Brain glow
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(bw, bh));
+    grad.addColorStop(0, 'rgba(100, 140, 180, ' + (alpha * 0.15) + ')');
+    grad.addColorStop(0.5, 'rgba(60, 100, 150, ' + (alpha * 0.08) + ')');
+    grad.addColorStop(1, 'rgba(20, 40, 80, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(-bw * 1.5, -bh * 1.5, bw * 3, bh * 3);
+
+    // Left hemisphere
+    ctx.beginPath();
+    ctx.moveTo(-bw * 0.05, -bh * 0.8);
+    ctx.bezierCurveTo(-bw * 0.5, -bh * 0.9, -bw * 0.9, -bh * 0.5, -bw * 0.85, 0);
+    ctx.bezierCurveTo(-bw * 0.9, bh * 0.4, -bw * 0.6, bh * 0.8, -bw * 0.1, bh * 0.7);
+    ctx.bezierCurveTo(-bw * 0.05, bh * 0.4, -bw * 0.05, -bh * 0.4, -bw * 0.05, -bh * 0.8);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(80, 120, 160, ' + (alpha * 0.12) + ')';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(140, 180, 210, ' + (alpha * 0.4) + ')';
+    ctx.lineWidth = Math.max(1, brainW * 0.005);
+    ctx.stroke();
+
+    // Right hemisphere
+    ctx.beginPath();
+    ctx.moveTo(bw * 0.05, -bh * 0.8);
+    ctx.bezierCurveTo(bw * 0.5, -bh * 0.9, bw * 0.9, -bh * 0.5, bw * 0.85, 0);
+    ctx.bezierCurveTo(bw * 0.9, bh * 0.4, bw * 0.6, bh * 0.8, bw * 0.1, bh * 0.7);
+    ctx.bezierCurveTo(bw * 0.05, bh * 0.4, bw * 0.05, -bh * 0.4, bw * 0.05, -bh * 0.8);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(80, 120, 160, ' + (alpha * 0.12) + ')';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(140, 180, 210, ' + (alpha * 0.4) + ')';
+    ctx.stroke();
+
+    // Sulci/folds (wavy lines across each hemisphere)
+    ctx.strokeStyle = 'rgba(140, 170, 200, ' + (alpha * 0.25) + ')';
+    ctx.lineWidth = Math.max(0.5, brainW * 0.003);
+    for (let i = 0; i < 5; i++) {
+      const yOff = -bh * 0.6 + i * bh * 0.3;
+      for (let side = -1; side <= 1; side += 2) {
+        ctx.beginPath();
+        ctx.moveTo(side * bw * 0.1, yOff);
+        ctx.bezierCurveTo(
+          side * bw * 0.35, yOff - bh * 0.08,
+          side * bw * 0.55, yOff + bh * 0.08,
+          side * bw * 0.75, yOff + bh * 0.02
+        );
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  // --- Scan lines overlay ---
+  function drawScanLines(ctx, cw, ch, alpha) {
+    if (alpha <= 0.01) return;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.12;
+    ctx.strokeStyle = 'rgba(200, 220, 240, 0.3)';
+    ctx.lineWidth = 1;
+    const spacing = 4;
+    for (let y = 0; y < ch; y += spacing) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(cw, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 
   function renderXrayEffect(drawX, drawY, scale, cw, ch) {
     if (!secretWord || !capturedImage) return;
 
-    // Calculate x-ray intensity (0 = normal photo, 1 = full x-ray)
-    const xrayIntensity = viewerZoom <= XRAY_START_ZOOM ? 0 :
-      Math.min(1, (viewerZoom - XRAY_START_ZOOM) / (XRAY_FULL_ZOOM - XRAY_START_ZOOM));
-
-    // Word visibility (0 = hidden, 1 = fully visible)
-    const wordVisibility = viewerZoom <= XRAY_WORD_ZOOM ? 0 :
-      Math.min(1, (viewerZoom - XRAY_WORD_ZOOM) / (XRAY_FULL_ZOOM - XRAY_WORD_ZOOM));
-
-    if (xrayIntensity <= 0) return; // Not zoomed enough yet
-
+    const supportsFilter = typeof zoomCtx.filter === 'string';
     const iw = capturedImage.width;
     const ih = capturedImage.height;
+    const drawW = iw * scale;
+    const drawH = ih * scale;
 
-    // --- Draw the secret word underneath (revealed as photo fades) ---
-    if (wordVisibility > 0) {
+    // Face position in screen coords
+    const facePosX = wordEmbedPosition ? wordEmbedPosition.x : iw / 2;
+    const facePosY = wordEmbedPosition ? wordEmbedPosition.y : ih / 2;
+    const faceScreenX = drawX + facePosX * scale;
+    const faceScreenY = drawY + facePosY * scale;
+
+    // Skull/brain size scales with zoom (based on approximate face size)
+    const faceSize = Math.min(iw, ih) * 0.5 * scale;
+    const skullW = faceSize * 0.7;
+    const skullH = faceSize * 0.9;
+    const brainW = faceSize * 0.55;
+    const brainH = faceSize * 0.45;
+
+    // Layer progress values (0-1 each)
+    const p1 = layerProgress(viewerZoom, 1, XRAY_L1_END);         // skin desat
+    const p2 = layerProgress(viewerZoom, XRAY_L2_START, XRAY_L2_END); // tissue
+    const p3 = layerProgress(viewerZoom, XRAY_L3_START, XRAY_L3_END); // skull
+    const p4 = layerProgress(viewerZoom, XRAY_L4_START, XRAY_L4_END); // brain cavity
+    const p5 = layerProgress(viewerZoom, XRAY_L5_START, XRAY_L5_END); // word reveal
+
+    // If no effect yet, bail
+    if (p1 <= 0 && p2 <= 0) return;
+
+    // ========================================
+    // LAYER 1: Skin desaturation (1x - 2x)
+    // Photo goes from color -> desaturated gray
+    // ========================================
+    if (p1 > 0 && supportsFilter) {
+      zoomCtx.save();
+      const desat = Math.round(100 - p1 * 60); // 100% -> 40%
+      const darkAmount = p1 * 0.15;
+      zoomCtx.globalAlpha = p1 * 0.4;
+      zoomCtx.filter = 'saturate(' + desat + '%) brightness(' + Math.round(100 - darkAmount * 100) + '%)';
+      zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
+      zoomCtx.filter = 'none';
+      zoomCtx.restore();
+    }
+
+    // ========================================
+    // LAYER 2: Tissue (1.5x - 5x)
+    // Dark desaturated gray, contrast boost, "under the skin"
+    // ========================================
+    if (p2 > 0) {
+      // Darken overlay
+      zoomCtx.save();
+      zoomCtx.globalAlpha = p2 * 0.5;
+      zoomCtx.fillStyle = '#0a0a10';
+      zoomCtx.fillRect(0, 0, cw, ch);
+      zoomCtx.restore();
+
+      // Re-draw photo inverted and desaturated for tissue look
+      if (supportsFilter) {
+        zoomCtx.save();
+        const invertAmt = Math.round(p2 * 70);
+        const satAmt = Math.round(100 - p2 * 80);
+        const contrastAmt = Math.round(100 + p2 * 60);
+        zoomCtx.globalAlpha = p2 * 0.5;
+        zoomCtx.filter = 'invert(' + invertAmt + '%) saturate(' + satAmt + '%) contrast(' + contrastAmt + '%) brightness(' + Math.round(100 + p2 * 20) + '%)';
+        zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
+        zoomCtx.filter = 'none';
+        zoomCtx.restore();
+      }
+    }
+
+    // ========================================
+    // LAYER 3: Skull (4x - 9x)
+    // Inverted high-contrast face + drawn skull overlay
+    // ========================================
+    if (p3 > 0) {
+      // Full x-ray inversion of the photo (white bones on black)
+      if (supportsFilter) {
+        zoomCtx.save();
+        zoomCtx.globalAlpha = p3 * 0.6;
+        zoomCtx.filter = 'invert(90%) saturate(5%) contrast(200%) brightness(120%)';
+        zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
+        zoomCtx.filter = 'none';
+        zoomCtx.restore();
+      }
+
+      // Darken non-skull areas more
+      zoomCtx.save();
+      zoomCtx.globalAlpha = p3 * 0.3;
+      zoomCtx.fillStyle = '#000';
+      zoomCtx.fillRect(0, 0, cw, ch);
+      zoomCtx.restore();
+
+      // Drawn skull overlay - face tracked
+      drawSkullOverlay(zoomCtx, faceScreenX, faceScreenY, skullW, skullH, p3);
+
+      // Scan lines during skull phase
+      drawScanLines(zoomCtx, cw, ch, p3);
+    }
+
+    // ========================================
+    // LAYER 4: Brain cavity (8x - 12x)
+    // Skull fades, dark void, brain shape appears
+    // ========================================
+    if (p4 > 0) {
+      // Heavy darkening - entering the void behind the skull
+      zoomCtx.save();
+      zoomCtx.globalAlpha = p4 * 0.7;
+      zoomCtx.fillStyle = '#020208';
+      zoomCtx.fillRect(0, 0, cw, ch);
+      zoomCtx.restore();
+
+      // Fading skull (becomes more transparent as brain appears)
+      if (p3 > 0) {
+        const fadingSkull = Math.max(0, 1 - p4);
+        if (fadingSkull > 0) {
+          drawSkullOverlay(zoomCtx, faceScreenX, faceScreenY, skullW, skullH, fadingSkull * 0.5);
+        }
+      }
+
+      // Brain shape appears
+      // Position brain slightly above and deeper than face center
+      const brainY = faceScreenY - skullH * 0.15;
+      drawBrainOverlay(zoomCtx, faceScreenX, brainY, brainW, brainH, p4);
+
+      // Light scan lines
+      drawScanLines(zoomCtx, cw, ch, p4 * 0.5);
+
+      // Residual x-ray glow of the face (very faint)
+      if (supportsFilter) {
+        zoomCtx.save();
+        zoomCtx.globalAlpha = (1 - p4) * 0.15;
+        zoomCtx.filter = 'invert(90%) saturate(0%) contrast(180%) brightness(80%)';
+        zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
+        zoomCtx.filter = 'none';
+        zoomCtx.restore();
+      }
+    }
+
+    // ========================================
+    // LAYER 5: Word reveal (10x - 15x)
+    // Brain fades, word appears in bone-white with halo glow
+    // ========================================
+    if (p5 > 0) {
+      // Final darkening
+      zoomCtx.save();
+      zoomCtx.globalAlpha = p5 * 0.4;
+      zoomCtx.fillStyle = '#000';
+      zoomCtx.fillRect(0, 0, cw, ch);
+      zoomCtx.restore();
+
+      // Fading brain
+      if (p4 > 0) {
+        const fadingBrain = Math.max(0, 1 - p5 * 0.7);
+        if (fadingBrain > 0) {
+          const brainY = faceScreenY - skullH * 0.15;
+          drawBrainOverlay(zoomCtx, faceScreenX, brainY, brainW, brainH, fadingBrain * p4);
+        }
+      }
+
+      // Word reveal - bone white with glow, positioned slightly deeper
       const wordGrid = cachedWordGrid || (cachedWordGrid = buildWordGrid(secretWord));
       if (wordGrid && wordGrid.length > 0) {
         const gridH = wordGrid.length;
         const gridW = wordGrid[0].length;
 
-        // Position at face/center
-        const imgCenterX = wordEmbedPosition ? wordEmbedPosition.x : Math.floor(iw / 2);
-        const imgCenterY = wordEmbedPosition ? wordEmbedPosition.y : Math.floor(ih / 2);
+        // Position: slightly below eyes, deep in brain
+        const wordCenterX = faceScreenX;
+        const wordCenterY = faceScreenY + skullH * 0.05;
 
-        // Screen coordinates of word center
-        const wordScreenX = drawX + imgCenterX * scale;
-        const wordScreenY = drawY + imgCenterY * scale;
-
-        // Scale word to be readable at current zoom
         const wordPixelScale = scale * 1.0;
         const totalW = gridW * wordPixelScale;
         const totalH = gridH * wordPixelScale;
-        const wordStartX = wordScreenX - totalW / 2;
-        const wordStartY = wordScreenY - totalH / 2;
+        const wordStartX = wordCenterX - totalW / 2;
+        const wordStartY = wordCenterY - totalH / 2;
 
-        // Glowing x-ray word effect
+        // Halo glow layers (2 passes)
         zoomCtx.save();
-
-        // Outer glow
-        const glowAlpha = wordVisibility * 0.3;
-        zoomCtx.shadowColor = 'rgba(0, 170, 255, ' + glowAlpha + ')';
-        zoomCtx.shadowBlur = 20 * wordVisibility;
-        zoomCtx.globalAlpha = wordVisibility * 0.9;
-
+        zoomCtx.globalAlpha = p5 * 0.25;
+        zoomCtx.shadowColor = 'rgba(200, 215, 230, ' + (p5 * 0.5) + ')';
+        zoomCtx.shadowBlur = 30 * p5;
+        zoomCtx.fillStyle = 'rgba(200, 215, 230, ' + (p5 * 0.3) + ')';
         for (let gy = 0; gy < gridH; gy++) {
           for (let gx = 0; gx < gridW; gx++) {
             if (wordGrid[gy][gx] === 1) {
-              const px = wordStartX + gx * wordPixelScale;
-              const py = wordStartY + gy * wordPixelScale;
-
-              // Bright cyan/white for x-ray word
-              const bright = 180 + Math.floor(75 * wordVisibility);
-              zoomCtx.fillStyle = 'rgb(' + Math.floor(bright * 0.7) + ',' + bright + ',' + bright + ')';
-              zoomCtx.fillRect(px, py, wordPixelScale, wordPixelScale);
+              zoomCtx.fillRect(
+                wordStartX + gx * wordPixelScale - wordPixelScale * 0.3,
+                wordStartY + gy * wordPixelScale - wordPixelScale * 0.3,
+                wordPixelScale * 1.6,
+                wordPixelScale * 1.6
+              );
             }
           }
         }
+        zoomCtx.restore();
 
+        // Main word - bone white matching skull tone
+        zoomCtx.save();
+        zoomCtx.globalAlpha = p5 * 0.95;
+        zoomCtx.shadowColor = 'rgba(220, 230, 240, ' + (p5 * 0.6) + ')';
+        zoomCtx.shadowBlur = 15 * p5;
+        for (let gy = 0; gy < gridH; gy++) {
+          for (let gx = 0; gx < gridW; gx++) {
+            if (wordGrid[gy][gx] === 1) {
+              // Bone-white with slight warm tone (like real x-ray bone)
+              const b = 210 + Math.floor(40 * p5);
+              zoomCtx.fillStyle = 'rgb(' + b + ',' + Math.floor(b * 0.97) + ',' + Math.floor(b * 0.93) + ')';
+              zoomCtx.fillRect(
+                wordStartX + gx * wordPixelScale,
+                wordStartY + gy * wordPixelScale,
+                wordPixelScale,
+                wordPixelScale
+              );
+            }
+          }
+        }
         zoomCtx.restore();
       }
     }
 
-    // --- X-ray overlay on the photo (blue tint + transparency) ---
-    zoomCtx.save();
-
-    // Darken: semi-transparent dark overlay that increases with zoom
-    zoomCtx.globalAlpha = xrayIntensity * 0.6;
-    zoomCtx.fillStyle = '#000';
-    zoomCtx.fillRect(0, 0, cw, ch);
-
-    // Blue/cyan x-ray tint overlay
-    zoomCtx.globalAlpha = xrayIntensity * 0.25;
-    zoomCtx.fillStyle = '#004466';
-    zoomCtx.fillRect(0, 0, cw, ch);
-
-    zoomCtx.restore();
-
-    // Re-draw the photo with x-ray filter and decreasing opacity
-    // This creates the "seeing through" effect
-    const photoAlpha = Math.max(0.08, 1 - xrayIntensity * 0.85);
-    const supportsFilter = typeof zoomCtx.filter === 'string';
-
-    zoomCtx.save();
-    zoomCtx.globalAlpha = photoAlpha;
-
-    // Apply x-ray visual filter: invert + blue shift + high contrast
-    if (supportsFilter) {
-      const invertPct = Math.round(xrayIntensity * 85);
-      const satPct = Math.round(100 - xrayIntensity * 70);
-      const brightPct = Math.round(100 + xrayIntensity * 30);
-      const hueDeg = Math.round(xrayIntensity * 190);
-      zoomCtx.filter = 'invert(' + invertPct + '%) saturate(' + satPct + '%) brightness(' + brightPct + '%) hue-rotate(' + hueDeg + 'deg)';
+    // ========================================
+    // Film grain overlay (present throughout all x-ray phases)
+    // ========================================
+    const grainIntensity = Math.max(p2, p3, p4) * 0.6;
+    if (grainIntensity > 0.01) {
+      // Use a smaller grain canvas for performance, tile it
+      const grainW = Math.min(cw, 512);
+      const grainH = Math.min(ch, 512);
+      const grain = getGrainCanvas(grainW, grainH);
+      zoomCtx.save();
+      zoomCtx.globalAlpha = grainIntensity;
+      // Tile grain across canvas
+      for (let gx = 0; gx < cw; gx += grainW) {
+        for (let gy = 0; gy < ch; gy += grainH) {
+          zoomCtx.drawImage(grain, gx, gy);
+        }
+      }
+      zoomCtx.restore();
     }
-
-    const drawW = iw * scale;
-    const drawH = ih * scale;
-    zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
-    zoomCtx.restore();
   }
 
   function updateZoomIndicator() {
