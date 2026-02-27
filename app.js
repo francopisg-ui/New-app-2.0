@@ -1355,6 +1355,48 @@
 
     if (!cachedCardGrid) {
       cachedCardGrid = buildCardGrid(cardSuit, cardValue);
+      // Build edge-distance grid for dithering (same approach as word reveal)
+      const gh = CARD_H;
+      const gw = CARD_W;
+      cachedCardEdgeGrid = [];
+      for (let y = 0; y < gh; y++) {
+        cachedCardEdgeGrid[y] = [];
+        for (let x = 0; x < gw; x++) {
+          if (cachedCardGrid[y][x] === 0) {
+            cachedCardEdgeGrid[y][x] = 0;
+            continue;
+          }
+          let minDist = Infinity;
+          for (let dy = -3; dy <= 3; dy++) {
+            for (let dx = -3; dx <= 3; dx++) {
+              if (dy === 0 && dx === 0) continue;
+              const ny = y + dy, nx = x + dx;
+              const isCard = (ny >= 0 && ny < gh && nx >= 0 && nx < gw) ? cachedCardGrid[ny][nx] > 0 : false;
+              if (!isCard) {
+                const dist = Math.sqrt(dy * dy + dx * dx);
+                if (dist < minDist) minDist = dist;
+              }
+            }
+          }
+          cachedCardEdgeGrid[y][x] = minDist === Infinity ? 1 : minDist;
+        }
+      }
+      let maxDist = 0;
+      for (let y = 0; y < gh; y++) {
+        for (let x = 0; x < gw; x++) {
+          if (cachedCardEdgeGrid[y][x] > maxDist) maxDist = cachedCardEdgeGrid[y][x];
+        }
+      }
+      if (maxDist > 0) {
+        for (let y = 0; y < gh; y++) {
+          for (let x = 0; x < gw; x++) {
+            if (cachedCardGrid[y][x] > 0) {
+              const t = cachedCardEdgeGrid[y][x] / maxDist;
+              cachedCardEdgeGrid[y][x] = 0.02 + 0.98 * (t * t);
+            }
+          }
+        }
+      }
     }
 
     const gridH = cachedCardGrid.length;
@@ -1366,17 +1408,22 @@
     const startX = imgCenterX - Math.floor(gridW / 2);
     const startY = imgCenterY - Math.floor(gridH / 2);
 
+    const data = capturedImageData.data;
+    // Shift amounts: card bg gets a lighter shift, ink gets a darker shift, border is medium
+    const BG_SHIFT = 15;    // card background: lighten
+    const INK_SHIFT = 15;   // ink (values, pips): darken
+    const BORDER_SHIFT = 10; // border: subtle darken
+    const BLEND = 0.50;
+    const DITHER = 0.95;
     const gap = scale > 20 ? 1 : 0;
-    const isRed = (cardSuit === 'hearts' || cardSuit === 'diamonds');
+
+    function seededRand(x, y) {
+      let h = (x * 374761393 + y * 668265263 + 1274126177) | 0;
+      h = ((h ^ (h >> 13)) * 1103515245) | 0;
+      return ((h & 0x7fffffff) / 0x7fffffff);
+    }
 
     zoomCtx.globalAlpha = opacity;
-
-    const COLOR_MAP = {
-      1: '#FFFFFF',       // card background
-      2: '#1a1a1a',       // black ink
-      3: isRed ? '#D40000' : '#1a1a1a', // suit color
-      4: '#AAAAAA'        // border
-    };
 
     for (let gy = 0; gy < gridH; gy++) {
       for (let gx = 0; gx < gridW; gx++) {
@@ -1385,7 +1432,43 @@
           const px = startX + gx;
           const py = startY + gy;
           if (px >= 0 && px < iw && py >= 0 && py < ih) {
-            zoomCtx.fillStyle = COLOR_MAP[cell];
+            const rand = seededRand(px, py);
+            const ef = cachedCardEdgeGrid[gy][gx];
+            if (rand > DITHER * ef) continue;
+
+            const idx = (py * iw + px) * 4;
+            const origR = data[idx];
+            const origG = data[idx + 1];
+            const origB = data[idx + 2];
+
+            const noise = 0.8 + seededRand(px + 999, py + 777) * 0.4;
+            let shift, sr, sg, sb;
+
+            if (cell === 1) {
+              // Card background: always lighten
+              shift = Math.round(BG_SHIFT * ef * noise);
+              sr = Math.min(255, origR + shift);
+              sg = Math.min(255, origG + shift);
+              sb = Math.min(255, origB + shift);
+            } else if (cell === 4) {
+              // Border: always darken slightly
+              shift = Math.round(BORDER_SHIFT * ef * noise);
+              sr = Math.max(0, origR - shift);
+              sg = Math.max(0, origG - shift);
+              sb = Math.max(0, origB - shift);
+            } else {
+              // Ink (2=black, 3=suit color): always darken
+              shift = Math.round(INK_SHIFT * ef * noise);
+              sr = Math.max(0, origR - shift);
+              sg = Math.max(0, origG - shift);
+              sb = Math.max(0, origB - shift);
+            }
+
+            const nr = Math.round(origR + (sr - origR) * BLEND);
+            const ng = Math.round(origG + (sg - origG) * BLEND);
+            const nb = Math.round(origB + (sb - origB) * BLEND);
+
+            zoomCtx.fillStyle = `rgb(${nr},${ng},${nb})`;
             zoomCtx.fillRect(
               drawX + px * scale + gap,
               drawY + py * scale + gap,
@@ -1709,27 +1792,42 @@
     const wordCtx = wordCanvas.getContext('2d');
 
     if (cardMode && cardSuit && cardValue) {
-      // Card mode: draw the full card as the reveal image
+      // Card mode: draw card as pixel-shifted photo (same look as zoom reveal)
       const cardGrid = cachedCardGrid || buildCardGrid(cardSuit, cardValue);
-      const isRed = (cardSuit === 'hearts' || cardSuit === 'diamonds');
-      const COLOR_MAP = {
-        1: '#FFFFFF', 2: '#1a1a1a',
-        3: isRed ? '#D40000' : '#1a1a1a', 4: '#AAAAAA'
-      };
-      // Scale card to fill ~80% of the screen height
       const cardScale = Math.floor(ch * 0.8 / CARD_H);
       const cardPxW = CARD_W * cardScale;
       const cardPxH = CARD_H * cardScale;
       const cardOffX = Math.floor((cw - cardPxW) / 2);
       const cardOffY = Math.floor((ch - cardPxH) / 2);
 
-      // Draw card onto wordCanvas directly (full color card)
+      // Get source photo pixel data for shifting
+      const srcData = sourceCtx.getImageData(0, 0, cw, ch);
+      const srcPixels = srcData.data;
+      const BG_SHIFT = 20;
+      const INK_SHIFT = 25;
+      const BORDER_SHIFT = 15;
+
+      // Draw card as shifted photo pixels onto wordCanvas
       for (let gy = 0; gy < CARD_H; gy++) {
         for (let gx = 0; gx < CARD_W; gx++) {
           const cell = cardGrid[gy][gx];
           if (cell > 0) {
-            wordCtx.fillStyle = COLOR_MAP[cell];
-            wordCtx.fillRect(cardOffX + gx * cardScale, cardOffY + gy * cardScale, cardScale, cardScale);
+            const rx = cardOffX + gx * cardScale;
+            const ry = cardOffY + gy * cardScale;
+            // Sample the center pixel of this card cell from the source
+            const sx = Math.min(cw - 1, rx + Math.floor(cardScale / 2));
+            const sy = Math.min(ch - 1, ry + Math.floor(cardScale / 2));
+            const idx = (sy * cw + sx) * 4;
+            const oR = srcPixels[idx], oG = srcPixels[idx + 1], oB = srcPixels[idx + 2];
+            let shift;
+            if (cell === 1) { shift = BG_SHIFT; } // lighten bg
+            else if (cell === 4) { shift = -BORDER_SHIFT; } // darken border
+            else { shift = -INK_SHIFT; } // darken ink
+            const nr = Math.max(0, Math.min(255, oR + shift));
+            const ng = Math.max(0, Math.min(255, oG + shift));
+            const nb = Math.max(0, Math.min(255, oB + shift));
+            wordCtx.fillStyle = `rgb(${nr},${ng},${nb})`;
+            wordCtx.fillRect(rx, ry, cardScale, cardScale);
           }
         }
       }
