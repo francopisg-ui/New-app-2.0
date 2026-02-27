@@ -1093,108 +1093,148 @@
 
   // --- Card Pixel Art ---
   // Grid cells: 0=transparent, 1=white(card bg), 2=black(ink), 3=suit-color(ink)
-  // Card is 21 wide x 31 tall image pixels
+  // Card is 41 wide x 61 tall image pixels
 
-  const CARD_W = 21;
-  const CARD_H = 31;
+  const CARD_W = 41;
+  const CARD_H = 61;
 
-  // Mini 3x5 font for corner values
+  // 5x7 font for corner values (larger for better visibility)
   const MINI_FONT = {
-    'A': [[0,1,0],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
-    '2': [[1,1,0],[0,0,1],[0,1,0],[1,0,0],[1,1,1]],
-    '3': [[1,1,0],[0,0,1],[0,1,0],[0,0,1],[1,1,0]],
-    '4': [[1,0,1],[1,0,1],[1,1,1],[0,0,1],[0,0,1]],
-    '5': [[1,1,1],[1,0,0],[1,1,0],[0,0,1],[1,1,0]],
-    '6': [[0,1,1],[1,0,0],[1,1,0],[1,0,1],[0,1,0]],
-    '7': [[1,1,1],[0,0,1],[0,1,0],[0,1,0],[0,1,0]],
-    '8': [[0,1,0],[1,0,1],[0,1,0],[1,0,1],[0,1,0]],
-    '9': [[0,1,0],[1,0,1],[0,1,1],[0,0,1],[1,1,0]],
-    '10':[[1,0,1,0],[1,0,1,1],[1,0,1,1],[1,0,1,1],[1,0,1,0]],
-    'J': [[0,1,1],[0,0,1],[0,0,1],[1,0,1],[0,1,0]],
-    'Q': [[0,1,0],[1,0,1],[1,0,1],[0,1,0],[0,0,1]],
-    'K': [[1,0,1],[1,1,0],[1,0,0],[1,1,0],[1,0,1]]
+    'A': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,1,1,1,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1]],
+    '2': [[0,1,1,1,0],[1,0,0,0,1],[0,0,0,0,1],[0,0,1,1,0],[0,1,0,0,0],[1,0,0,0,0],[1,1,1,1,1]],
+    '3': [[1,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[0,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[1,1,1,1,0]],
+    '4': [[1,0,0,1,0],[1,0,0,1,0],[1,0,0,1,0],[1,1,1,1,1],[0,0,0,1,0],[0,0,0,1,0],[0,0,0,1,0]],
+    '5': [[1,1,1,1,1],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[1,1,1,1,0]],
+    '6': [[0,1,1,1,0],[1,0,0,0,0],[1,0,0,0,0],[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+    '7': [[1,1,1,1,1],[0,0,0,0,1],[0,0,0,1,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0]],
+    '8': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
+    '9': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,1],[0,0,0,0,1],[0,0,0,0,1],[0,1,1,1,0]],
+    '10':[[1,0,0,1,1,0],[1,0,1,0,0,1],[1,0,1,0,0,1],[1,0,1,0,0,1],[1,0,1,0,0,1],[1,0,1,0,0,1],[1,0,0,1,1,0]],
+    'J': [[0,0,1,1,1],[0,0,0,1,0],[0,0,0,1,0],[0,0,0,1,0],[1,0,0,1,0],[1,0,0,1,0],[0,1,1,0,0]],
+    'Q': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,1,0,1],[0,1,1,1,0],[0,0,0,1,1]],
+    'K': [[1,0,0,0,1],[1,0,0,1,0],[1,0,1,0,0],[1,1,0,0,0],[1,0,1,0,0],[1,0,0,1,0],[1,0,0,0,1]]
   };
 
-  // 3x3 mini suit symbols for corners
+  // 5x5 suit symbols for corners (larger for better visibility)
   const MINI_SUITS = {
-    spades:   [[0,1,0],[1,1,1],[0,1,0]],
-    hearts:   [[1,0,1],[1,1,1],[0,1,0]],
-    clubs:    [[0,1,0],[1,1,1],[0,1,0]],
-    diamonds: [[0,1,0],[1,1,1],[0,1,0]]
+    spades:   [[0,0,1,0,0],[0,1,1,1,0],[1,1,1,1,1],[0,0,1,0,0],[0,1,0,1,0]],
+    hearts:   [[0,1,0,1,0],[1,1,1,1,1],[1,1,1,1,1],[0,1,1,1,0],[0,0,1,0,0]],
+    clubs:    [[0,0,1,0,0],[0,1,1,1,0],[1,1,0,1,1],[0,1,1,1,0],[0,0,1,0,0]],
+    diamonds: [[0,0,1,0,0],[0,1,1,1,0],[1,1,1,1,1],[0,1,1,1,0],[0,0,1,0,0]]
   };
 
-  // 5x5 suit pips for card body
+  // 9x9 suit pips for card body (larger for clear visibility when zoomed)
   const SUIT_PIPS = {
     spades: [
-      [0,0,1,0,0],
-      [0,1,1,1,0],
-      [1,1,1,1,1],
-      [0,0,1,0,0],
-      [0,1,0,1,0]
+      [0,0,0,0,1,0,0,0,0],
+      [0,0,0,1,1,1,0,0,0],
+      [0,0,1,1,1,1,1,0,0],
+      [0,1,1,1,1,1,1,1,0],
+      [1,1,1,1,1,1,1,1,1],
+      [0,0,0,1,1,1,0,0,0],
+      [0,0,1,1,0,1,1,0,0],
+      [0,1,1,0,0,0,1,1,0],
+      [0,0,0,0,0,0,0,0,0]
     ],
     hearts: [
-      [0,1,0,1,0],
-      [1,1,1,1,1],
-      [1,1,1,1,1],
-      [0,1,1,1,0],
-      [0,0,1,0,0]
+      [0,0,0,0,0,0,0,0,0],
+      [0,1,1,0,0,0,1,1,0],
+      [1,1,1,1,0,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1],
+      [0,1,1,1,1,1,1,1,0],
+      [0,0,1,1,1,1,1,0,0],
+      [0,0,0,1,1,1,0,0,0],
+      [0,0,0,0,1,0,0,0,0]
     ],
     clubs: [
-      [0,0,1,0,0],
-      [0,1,1,1,0],
-      [1,1,0,1,1],
-      [0,1,1,1,0],
-      [0,0,1,0,0]
+      [0,0,0,1,1,1,0,0,0],
+      [0,0,1,1,1,1,1,0,0],
+      [0,0,0,1,1,1,0,0,0],
+      [0,1,1,0,1,0,1,1,0],
+      [1,1,1,1,1,1,1,1,1],
+      [0,1,1,0,1,0,1,1,0],
+      [0,0,0,1,1,1,0,0,0],
+      [0,0,0,0,1,0,0,0,0],
+      [0,0,0,1,1,1,0,0,0]
     ],
     diamonds: [
-      [0,0,1,0,0],
-      [0,1,1,1,0],
-      [1,1,1,1,1],
-      [0,1,1,1,0],
-      [0,0,1,0,0]
+      [0,0,0,0,1,0,0,0,0],
+      [0,0,0,1,1,1,0,0,0],
+      [0,0,1,1,1,1,1,0,0],
+      [0,1,1,1,1,1,1,1,0],
+      [1,1,1,1,1,1,1,1,1],
+      [0,1,1,1,1,1,1,1,0],
+      [0,0,1,1,1,1,1,0,0],
+      [0,0,0,1,1,1,0,0,0],
+      [0,0,0,0,1,0,0,0,0]
     ]
   };
 
-  // 7x9 face figures for J, Q, K
+  // 13x17 face figures for J, Q, K (larger for clear visibility when zoomed)
   const FACE_FIGURES = {
     'J': [
-      [0,0,1,1,1,0,0],
-      [0,1,0,1,0,1,0],
-      [0,0,0,1,0,0,0],
-      [0,1,1,1,1,1,0],
-      [0,0,1,1,1,0,0],
-      [0,0,1,0,1,0,0],
-      [0,0,1,0,1,0,0],
-      [0,1,1,0,1,1,0],
-      [0,1,1,1,1,1,0]
+      [0,0,0,0,1,1,1,1,1,0,0,0,0],
+      [0,0,0,1,1,1,1,1,1,1,0,0,0],
+      [0,0,0,1,0,1,0,1,0,1,0,0,0],
+      [0,0,0,0,0,0,1,0,0,0,0,0,0],
+      [0,0,0,0,0,1,1,1,0,0,0,0,0],
+      [0,0,0,0,1,1,1,1,1,0,0,0,0],
+      [0,0,1,1,1,1,1,1,1,1,1,0,0],
+      [0,1,1,1,0,1,1,1,0,1,1,1,0],
+      [0,0,1,1,1,1,1,1,1,1,1,0,0],
+      [0,0,0,1,1,1,1,1,1,1,0,0,0],
+      [0,0,0,0,1,1,1,1,1,0,0,0,0],
+      [0,0,0,0,1,0,0,0,1,0,0,0,0],
+      [0,0,0,0,1,0,0,0,1,0,0,0,0],
+      [0,0,0,1,1,0,0,0,1,1,0,0,0],
+      [0,0,0,1,1,1,1,1,1,1,0,0,0],
+      [0,0,1,1,1,1,1,1,1,1,1,0,0],
+      [0,0,1,1,1,1,1,1,1,1,1,0,0]
     ],
     'Q': [
-      [0,0,1,1,1,0,0],
-      [0,1,0,1,0,1,0],
-      [0,0,0,1,0,0,0],
-      [0,1,1,1,1,1,0],
-      [1,1,1,1,1,1,1],
-      [0,1,1,0,1,1,0],
-      [0,0,1,0,1,0,0],
-      [0,1,0,0,0,1,0],
-      [0,1,1,1,1,1,0]
+      [0,0,0,0,1,1,1,1,1,0,0,0,0],
+      [0,0,0,1,1,1,1,1,1,1,0,0,0],
+      [0,0,0,1,0,1,0,1,0,1,0,0,0],
+      [0,0,0,0,0,0,1,0,0,0,0,0,0],
+      [0,0,0,0,0,1,1,1,0,0,0,0,0],
+      [0,0,0,0,1,1,1,1,1,0,0,0,0],
+      [0,0,1,1,1,1,1,1,1,1,1,0,0],
+      [0,1,1,1,1,1,1,1,1,1,1,1,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [0,1,1,1,0,1,1,1,0,1,1,1,0],
+      [0,0,1,1,1,1,1,1,1,1,1,0,0],
+      [0,0,0,1,1,0,0,0,1,1,0,0,0],
+      [0,0,0,0,1,0,0,0,1,0,0,0,0],
+      [0,0,0,1,0,0,0,0,0,1,0,0,0],
+      [0,0,0,1,1,1,1,1,1,1,0,0,0],
+      [0,0,1,1,1,1,1,1,1,1,1,0,0],
+      [0,0,1,1,1,1,1,1,1,1,1,0,0]
     ],
     'K': [
-      [0,1,1,1,1,1,0],
-      [0,1,0,1,0,1,0],
-      [0,0,0,1,0,0,0],
-      [1,1,1,1,1,1,1],
-      [0,1,1,1,1,1,0],
-      [0,0,1,0,1,0,0],
-      [0,0,1,0,1,0,0],
-      [0,1,1,0,1,1,0],
-      [0,1,1,1,1,1,0]
+      [0,0,1,1,1,1,1,1,1,1,1,0,0],
+      [0,0,0,1,1,1,1,1,1,1,0,0,0],
+      [0,0,0,1,0,1,0,1,0,1,0,0,0],
+      [0,0,0,0,0,0,1,0,0,0,0,0,0],
+      [0,0,0,0,0,1,1,1,0,0,0,0,0],
+      [0,1,1,1,1,1,1,1,1,1,1,1,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [0,1,1,1,1,1,1,1,1,1,1,1,0],
+      [0,0,1,1,1,1,1,1,1,1,1,0,0],
+      [0,0,0,1,1,0,1,0,1,1,0,0,0],
+      [0,0,0,0,1,0,0,0,1,0,0,0,0],
+      [0,0,0,0,1,0,0,0,1,0,0,0,0],
+      [0,0,0,1,1,0,0,0,1,1,0,0,0],
+      [0,0,0,1,1,0,0,0,1,1,0,0,0],
+      [0,0,0,1,1,1,1,1,1,1,0,0,0],
+      [0,0,1,1,1,1,1,1,1,1,1,0,0],
+      [0,0,1,1,1,1,1,1,1,1,1,0,0]
     ]
   };
 
   // Pip layout positions for number cards (row, col offsets from card center area)
-  // Card body area is cols 3-17, rows 7-23 (15w x 17h)
-  // Positions defined as [row, col] within body area center (7.5, 7.5)
+  // Card body area is cols 10-30, rows 12-48
+  // Positions defined as [row, col] relative to body center
   function getPipPositions(value) {
     // Positions relative to center of body (8, 7.5), half-body is 8.5 rows, 7.5 cols
     // Expressed as fractions of half-body then mapped to actual positions
@@ -1214,7 +1254,7 @@
   }
 
   function buildCardGrid(suit, value) {
-    // Create 21x31 grid, fill with 0 (transparent)
+    // Create 41x61 grid, fill with 0 (transparent)
     const grid = [];
     for (let y = 0; y < CARD_H; y++) {
       grid[y] = new Array(CARD_W).fill(0);
@@ -1238,29 +1278,29 @@
     // --- Corner value (top-left) ---
     const valGlyph = MINI_FONT[value];
     const vw = valGlyph[0].length;
-    for (let r = 0; r < 5; r++) {
+    for (let r = 0; r < 7; r++) {
       for (let c = 0; c < vw; c++) {
-        if (valGlyph[r][c]) grid[2 + r][2 + c] = inkColor;
+        if (valGlyph[r][c]) grid[3 + r][3 + c] = inkColor;
       }
     }
 
     // --- Corner suit pip (top-left, below value) ---
     const miniSuit = MINI_SUITS[suit];
-    for (let r = 0; r < 3; r++) {
-      for (let c = 0; c < 3; c++) {
-        if (miniSuit[r][c]) grid[8 + r][2 + c] = inkColor;
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 5; c++) {
+        if (miniSuit[r][c]) grid[12 + r][3 + c] = inkColor;
       }
     }
 
     // --- Bottom-right corner (rotated 180) ---
-    for (let r = 0; r < 5; r++) {
+    for (let r = 0; r < 7; r++) {
       for (let c = 0; c < vw; c++) {
-        if (valGlyph[r][c]) grid[CARD_H - 3 - r][CARD_W - 3 - c] = inkColor;
+        if (valGlyph[r][c]) grid[CARD_H - 4 - r][CARD_W - 4 - c] = inkColor;
       }
     }
-    for (let r = 0; r < 3; r++) {
-      for (let c = 0; c < 3; c++) {
-        if (miniSuit[r][c]) grid[CARD_H - 9 - r][CARD_W - 3 - c] = inkColor;
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 5; c++) {
+        if (miniSuit[r][c]) grid[CARD_H - 13 - r][CARD_W - 4 - c] = inkColor;
       }
     }
 
@@ -1285,10 +1325,10 @@
 
     // --- Center body: pips or face figure ---
     const pip = SUIT_PIPS[suit];
-    const bodyTop = 8;
-    const bodyBot = CARD_H - 9;
-    const bodyLeft = 6;
-    const bodyRight = CARD_W - 7;
+    const bodyTop = 12;
+    const bodyBot = CARD_H - 13;
+    const bodyLeft = 10;
+    const bodyRight = CARD_W - 11;
     const bodyCenterX = Math.floor((bodyLeft + bodyRight) / 2);
     const bodyCenterY = Math.floor((bodyTop + bodyBot) / 2);
     const bodyHalfH = (bodyBot - bodyTop) / 2;
@@ -1312,14 +1352,14 @@
           }
         }
       }
-      // Add small suit pip above and below figure
-      const pipAboveY = startY - 4;
+      // Add suit pip above and below figure
+      const pipAboveY = startY - 6;
       const pipBelowY = startY + fh + 1;
-      for (let r = 0; r < 3; r++) {
-        for (let c = 0; c < 3; c++) {
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 5; c++) {
           if (miniSuit[r][c]) {
-            if (pipAboveY + r >= 0) grid[pipAboveY + r][bodyCenterX - 1 + c] = inkColor;
-            if (pipBelowY + r < CARD_H) grid[pipBelowY + r][bodyCenterX - 1 + c] = inkColor;
+            if (pipAboveY + r >= 0) grid[pipAboveY + r][bodyCenterX - 2 + c] = inkColor;
+            if (pipBelowY + r < CARD_H) grid[pipBelowY + r][bodyCenterX - 2 + c] = inkColor;
           }
         }
       }
@@ -1329,12 +1369,12 @@
       for (const [pRow, pCol] of positions) {
         const py = Math.round(bodyCenterY + pRow * bodyHalfH * 0.75);
         const px = Math.round(bodyCenterX + pCol * bodyHalfW * 0.7);
-        // Place 5x5 pip centered at (py, px)
-        for (let r = 0; r < 5; r++) {
-          for (let c = 0; c < 5; c++) {
+        // Place 9x9 pip centered at (py, px)
+        for (let r = 0; r < 9; r++) {
+          for (let c = 0; c < 9; c++) {
             if (pip[r][c]) {
-              const gy = py - 2 + r;
-              const gx = px - 2 + c;
+              const gy = py - 4 + r;
+              const gx = px - 4 + c;
               if (gy >= 1 && gy < CARD_H - 1 && gx >= 1 && gx < CARD_W - 1) {
                 grid[gy][gx] = inkColor;
               }
@@ -1410,10 +1450,10 @@
 
     const data = capturedImageData.data;
     // Shift amounts: card bg gets a lighter shift, ink gets a darker shift, border is medium
-    const BG_SHIFT = 60;    // card background: lighten strongly
-    const INK_SHIFT = 70;   // ink (values, pips): darken strongly
-    const BORDER_SHIFT = 45; // border: visible darken
-    const BLEND = 0.85;
+    const BG_SHIFT = 100;    // card background: lighten strongly
+    const INK_SHIFT = 130;   // ink (values, pips): darken strongly
+    const BORDER_SHIFT = 70; // border: visible darken
+    const BLEND = 0.92;
     const DITHER = 1.0;
     const gap = scale > 20 ? 1 : 0;
 
@@ -1434,7 +1474,9 @@
           if (px >= 0 && px < iw && py >= 0 && py < ih) {
             const rand = seededRand(px, py);
             const ef = cachedCardEdgeGrid[gy][gx];
-            if (rand > DITHER * ef) continue;
+            // Ink pixels (values, suits, pips) stay more solid for clear visibility
+            const ditherThreshold = (cell === 2 || cell === 3) ? Math.max(0.75, DITHER * ef) : DITHER * ef;
+            if (rand > ditherThreshold) continue;
 
             const idx = (py * iw + px) * 4;
             const origR = data[idx];
@@ -1803,9 +1845,9 @@
       // Get source photo pixel data for shifting
       const srcData = sourceCtx.getImageData(0, 0, cw, ch);
       const srcPixels = srcData.data;
-      const BG_SHIFT = 60;
-      const INK_SHIFT = 70;
-      const BORDER_SHIFT = 45;
+      const BG_SHIFT = 100;
+      const INK_SHIFT = 130;
+      const BORDER_SHIFT = 70;
 
       // Draw card as shifted photo pixels onto wordCanvas
       for (let gy = 0; gy < CARD_H; gy++) {
