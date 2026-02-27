@@ -1836,7 +1836,7 @@
       zoomCtx.restore();
 
       // Brain overlay fades in — face tracked
-      const brainY = faceScreenY - brainH * 0.08;
+      const brainY = faceScreenY - brainH * 0.25;
       drawBrainOverlay(zoomCtx, faceScreenX, brainY, brainW, brainH, p3);
 
       // Scan lines during brain reveal
@@ -1856,7 +1856,7 @@
       zoomCtx.restore();
 
       // Brain at full presence
-      const brainY = faceScreenY - brainH * 0.08;
+      const brainY = faceScreenY - brainH * 0.25;
       drawBrainOverlay(zoomCtx, faceScreenX, brainY, brainW, brainH, p4);
 
       // Light scan lines
