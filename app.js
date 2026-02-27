@@ -1661,8 +1661,8 @@
   function drawBrainOverlay(ctx, cx, cy, brainW, brainH, alpha) {
     if (!brainImg.complete || !brainImg.naturalWidth) return;
     ctx.save();
-    // Ghost-like transparency
-    ctx.globalAlpha = alpha * 0.12;
+    // Ghost-like transparency (15% more transparent than original)
+    ctx.globalAlpha = alpha * 0.102;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(brainImg, cx - brainW / 2, cy - brainH / 2, brainW, brainH);
     // Pulsing highlight (subtle animated glow)
@@ -1711,8 +1711,8 @@
 
     // Brain size scales with zoom (sized to fill the face guide circle)
     const faceSize = Math.min(iw, ih) * 0.5 * scale;
-    const brainW = faceSize * 1.2;
-    const brainH = faceSize * 1.15;
+    const brainW = faceSize * 0.84;
+    const brainH = faceSize * 0.805;
 
     // Layer progress values (0-1 each)
     const p1 = layerProgress(viewerZoom, XRAY_L1_START, XRAY_L1_END); // skin desat
