@@ -1280,17 +1280,17 @@
   }
 
   // --- X-Ray Effect Rendering (5-Layer System) ---
-  // Layer boundaries — effect starts immediately at any zoom > 1
+  // Layer boundaries — fast transition, all layers within 1x-5x zoom
   const XRAY_L1_START = 1.0;  // Layer 1 starts: skin desaturation (instant)
-  const XRAY_L1_END = 1.8;    // Layer 1 peaks
-  const XRAY_L2_START = 1.3;  // Layer 2 starts: tissue
-  const XRAY_L2_END = 3.0;    // Layer 2 peaks
-  const XRAY_L3_START = 2.5;  // Layer 3 starts: skull
-  const XRAY_L3_END = 5.5;    // Layer 3 peaks
-  const XRAY_L4_START = 5.0;  // Layer 4 starts: brain cavity
-  const XRAY_L4_END = 8.0;    // Layer 4 peaks
-  const XRAY_L5_START = 7.0;  // Layer 5 starts: word reveal
-  const XRAY_L5_END = 10.0;   // Layer 5 fully visible
+  const XRAY_L1_END = 1.3;    // Layer 1 peaks
+  const XRAY_L2_START = 1.1;  // Layer 2 starts: tissue
+  const XRAY_L2_END = 1.8;    // Layer 2 peaks
+  const XRAY_L3_START = 1.5;  // Layer 3 starts: skull
+  const XRAY_L3_END = 3.0;    // Layer 3 peaks
+  const XRAY_L4_START = 2.5;  // Layer 4 starts: brain cavity
+  const XRAY_L4_END = 4.0;    // Layer 4 peaks
+  const XRAY_L5_START = 3.5;  // Layer 5 starts: word reveal
+  const XRAY_L5_END = 5.0;    // Layer 5 fully visible
 
   // Grain texture canvas (generated once, reused)
   let grainCanvas = null;
@@ -1539,15 +1539,62 @@
     // If no effect yet, bail
     if (p1 <= 0 && p2 <= 0) return;
 
+    // Overall x-ray intensity (for global effects)
+    const xrayIntensity = Math.max(p1, p2, p3, p4, p5);
+
     // ========================================
-    // LAYER 1: Skin desaturation (1x - 1.8x)
+    // X-RAY FADE-IN: Blue/cyan tint (like an x-ray machine powering on)
+    // ========================================
+    if (xrayIntensity > 0) {
+      // Subtle blue-cyan tint that grows with x-ray intensity
+      zoomCtx.save();
+      const blueAlpha = Math.min(xrayIntensity * 0.35, 0.35);
+      zoomCtx.globalCompositeOperation = 'multiply';
+      zoomCtx.globalAlpha = blueAlpha;
+      zoomCtx.fillStyle = '#5080c0';
+      zoomCtx.fillRect(0, 0, cw, ch);
+      zoomCtx.restore();
+
+      // X-ray power-on flicker (subtle random brightness pulses at low zoom)
+      if (p1 > 0 && p3 < 0.5) {
+        const flickerPhase = Math.sin(Date.now() * 0.008) * 0.5 + Math.sin(Date.now() * 0.013) * 0.3;
+        const flickerAlpha = Math.max(0, flickerPhase * 0.06 * (1 - p3));
+        if (flickerAlpha > 0.005) {
+          zoomCtx.save();
+          zoomCtx.globalAlpha = flickerAlpha;
+          zoomCtx.fillStyle = '#aaccff';
+          zoomCtx.fillRect(0, 0, cw, ch);
+          zoomCtx.restore();
+        }
+      }
+
+      // Radial vignette centered on face (dark edges, bright center)
+      const vignetteAlpha = Math.min(xrayIntensity * 0.6, 0.6);
+      if (vignetteAlpha > 0.02) {
+        const vigRadius = Math.max(cw, ch) * 0.7;
+        const grad = zoomCtx.createRadialGradient(
+          faceScreenX, faceScreenY, vigRadius * 0.2,
+          faceScreenX, faceScreenY, vigRadius
+        );
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(0.6, 'rgba(0,0,10,' + (vignetteAlpha * 0.3) + ')');
+        grad.addColorStop(1, 'rgba(0,0,10,' + vignetteAlpha + ')');
+        zoomCtx.save();
+        zoomCtx.fillStyle = grad;
+        zoomCtx.fillRect(0, 0, cw, ch);
+        zoomCtx.restore();
+      }
+    }
+
+    // ========================================
+    // LAYER 1: Skin desaturation (1x - 1.3x)
     // Photo goes from color -> desaturated gray
     // ========================================
     if (p1 > 0 && supportsFilter) {
       zoomCtx.save();
-      const desat = Math.round(100 - p1 * 80); // 100% -> 20% (stronger desaturation)
-      const darkAmount = p1 * 0.25;
-      zoomCtx.globalAlpha = p1 * 0.7;
+      const desat = Math.round(100 - p1 * 90); // 100% -> 10% (aggressive desaturation)
+      const darkAmount = p1 * 0.3;
+      zoomCtx.globalAlpha = p1 * 0.85;
       zoomCtx.filter = 'saturate(' + desat + '%) brightness(' + Math.round(100 - darkAmount * 100) + '%)';
       zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
       zoomCtx.filter = 'none';
@@ -1555,40 +1602,57 @@
     }
 
     // ========================================
-    // LAYER 2: Tissue (1.3x - 3x)
+    // LAYER 2: Tissue (1.1x - 1.8x)
     // Dark desaturated gray, contrast boost, "under the skin"
     // ========================================
     if (p2 > 0) {
       // Darken overlay
       zoomCtx.save();
-      zoomCtx.globalAlpha = p2 * 0.65;
-      zoomCtx.fillStyle = '#0a0a10';
+      zoomCtx.globalAlpha = p2 * 0.75;
+      zoomCtx.fillStyle = '#060610';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
 
       // Re-draw photo inverted and desaturated for tissue look
       if (supportsFilter) {
         zoomCtx.save();
-        const invertAmt = Math.round(p2 * 80);
-        const satAmt = Math.round(100 - p2 * 90);
-        const contrastAmt = Math.round(100 + p2 * 80);
-        zoomCtx.globalAlpha = p2 * 0.65;
-        zoomCtx.filter = 'invert(' + invertAmt + '%) saturate(' + satAmt + '%) contrast(' + contrastAmt + '%) brightness(' + Math.round(100 + p2 * 25) + '%)';
+        const invertAmt = Math.round(p2 * 85);
+        const satAmt = Math.round(100 - p2 * 95);
+        const contrastAmt = Math.round(100 + p2 * 100);
+        zoomCtx.globalAlpha = p2 * 0.75;
+        zoomCtx.filter = 'invert(' + invertAmt + '%) saturate(' + satAmt + '%) contrast(' + contrastAmt + '%) brightness(' + Math.round(100 + p2 * 30) + '%)';
         zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
         zoomCtx.filter = 'none';
+        zoomCtx.restore();
+      }
+
+      // Subtle cyan edge glow around face during tissue phase
+      if (p2 > 0.3) {
+        const edgeGlowAlpha = (p2 - 0.3) * 0.15;
+        const glowRadius = faceSize * 0.6;
+        const edgeGrad = zoomCtx.createRadialGradient(
+          faceScreenX, faceScreenY, glowRadius * 0.8,
+          faceScreenX, faceScreenY, glowRadius * 1.3
+        );
+        edgeGrad.addColorStop(0, 'rgba(0,150,220,0)');
+        edgeGrad.addColorStop(0.5, 'rgba(0,120,200,' + edgeGlowAlpha + ')');
+        edgeGrad.addColorStop(1, 'rgba(0,80,160,0)');
+        zoomCtx.save();
+        zoomCtx.fillStyle = edgeGrad;
+        zoomCtx.fillRect(0, 0, cw, ch);
         zoomCtx.restore();
       }
     }
 
     // ========================================
-    // LAYER 3: Skull (2.5x - 5.5x)
+    // LAYER 3: Skull (1.5x - 3x)
     // Inverted high-contrast face + drawn skull overlay
     // ========================================
     if (p3 > 0) {
       // Full x-ray inversion of the photo (white bones on black)
       if (supportsFilter) {
         zoomCtx.save();
-        zoomCtx.globalAlpha = p3 * 0.75;
+        zoomCtx.globalAlpha = p3 * 0.85;
         zoomCtx.filter = 'invert(90%) saturate(5%) contrast(200%) brightness(120%)';
         zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
         zoomCtx.filter = 'none';
@@ -1597,8 +1661,8 @@
 
       // Darken non-skull areas more
       zoomCtx.save();
-      zoomCtx.globalAlpha = p3 * 0.4;
-      zoomCtx.fillStyle = '#000';
+      zoomCtx.globalAlpha = p3 * 0.5;
+      zoomCtx.fillStyle = '#000008';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
 
@@ -1607,17 +1671,32 @@
 
       // Scan lines during skull phase
       drawScanLines(zoomCtx, cw, ch, p3);
+
+      // X-ray bone glow (bright edges around skull area)
+      if (p3 > 0.4) {
+        const boneGlowAlpha = (p3 - 0.4) * 0.12;
+        zoomCtx.save();
+        zoomCtx.shadowColor = 'rgba(180,210,240,' + boneGlowAlpha + ')';
+        zoomCtx.shadowBlur = 40;
+        zoomCtx.globalAlpha = boneGlowAlpha;
+        zoomCtx.strokeStyle = 'rgba(180,210,240,0.15)';
+        zoomCtx.lineWidth = 2;
+        zoomCtx.beginPath();
+        zoomCtx.ellipse(faceScreenX, faceScreenY - skullH * 0.1, skullW * 0.5, skullH * 0.55, 0, 0, Math.PI * 2);
+        zoomCtx.stroke();
+        zoomCtx.restore();
+      }
     }
 
     // ========================================
-    // LAYER 4: Brain cavity (5x - 8x)
+    // LAYER 4: Brain cavity (2.5x - 4x)
     // Skull fades, dark void, brain shape appears
     // ========================================
     if (p4 > 0) {
       // Heavy darkening - entering the void behind the skull
       zoomCtx.save();
-      zoomCtx.globalAlpha = p4 * 0.7;
-      zoomCtx.fillStyle = '#020208';
+      zoomCtx.globalAlpha = p4 * 0.8;
+      zoomCtx.fillStyle = '#010108';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
 
@@ -1640,7 +1719,7 @@
       // Residual x-ray glow of the face (very faint)
       if (supportsFilter) {
         zoomCtx.save();
-        zoomCtx.globalAlpha = (1 - p4) * 0.15;
+        zoomCtx.globalAlpha = (1 - p4) * 0.1;
         zoomCtx.filter = 'invert(90%) saturate(0%) contrast(180%) brightness(80%)';
         zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
         zoomCtx.filter = 'none';
@@ -1649,7 +1728,7 @@
     }
 
     // ========================================
-    // LAYER 5: Word reveal (7x - 10x)
+    // LAYER 5: Word reveal (3.5x - 5x)
     // Brain fades, word appears in bone-white with halo glow
     // ========================================
     if (p5 > 0) {
@@ -1730,9 +1809,9 @@
     }
 
     // ========================================
-    // Film grain overlay (present throughout all x-ray phases)
+    // Film grain + scan lines overlay (present from the start)
     // ========================================
-    const grainIntensity = Math.max(p1 * 0.3, p2, p3, p4) * 0.6;
+    const grainIntensity = Math.max(p1 * 0.5, p2, p3, p4) * 0.7;
     if (grainIntensity > 0.01) {
       // Use a smaller grain canvas for performance, tile it
       const grainW = Math.min(cw, 512);
@@ -1747,6 +1826,11 @@
         }
       }
       zoomCtx.restore();
+    }
+
+    // Global scan lines from the start (x-ray film look)
+    if (p1 > 0.3) {
+      drawScanLines(zoomCtx, cw, ch, Math.min(p1, 0.6));
     }
   }
 
