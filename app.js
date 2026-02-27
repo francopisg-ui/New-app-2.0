@@ -37,7 +37,7 @@
   let viewerZoom = 1;
   let viewerPanX = 0;
   let viewerPanY = 0;
-  let viewerMaxZoom = 2000;
+  let viewerMaxZoom = 800;
   let viewerMinZoom = 1;
 
   // Touch tracking
@@ -70,8 +70,8 @@
   let viewerTouchMoved = false;
 
   // Secret reveal config
-  const SECRET_REVEAL_THRESHOLD = 100;
-  const SECRET_FULL_OPACITY_ZOOM = 200;
+  const SECRET_REVEAL_THRESHOLD = 3;
+  const SECRET_FULL_OPACITY_ZOOM = 15;
 
   // Pixel reveal config
   const PIXEL_FONT = {
@@ -1331,8 +1331,8 @@
   const XRAY_L3_END = 2.5;    // Layer 3 peaks (skull visible by 1.7x)
   const XRAY_L4_START = 2.0;  // Layer 4 starts: brain cavity
   const XRAY_L4_END = 3.0;    // Layer 4 peaks (brain visible by ~2.1x)
-  const XRAY_L5_START = 150.0; // Layer 5 starts: word reveal begins
-  const XRAY_L5_END = 200.0;   // Layer 5 fully visible (every letter clear by 200x)
+  const XRAY_L5_START = 15.0; // Layer 5 starts: word reveal begins
+  const XRAY_L5_END = 30.0;   // Layer 5 fully visible (every letter clear by 30x)
 
   // Grain texture canvas (generated once, reused)
   let grainCanvas = null;
@@ -1817,7 +1817,7 @@
     const baseScale = Math.max(cw / iw, ch / ih);
 
     const targetPos = wordEmbedPosition || { x: iw / 2, y: ih / 2 };
-    const targetZoom = 200;
+    const targetZoom = 25;
     const zoomInDuration = 3000;
     const pauseDuration = 1500;
     const zoomOutDuration = 2000;
