@@ -25,11 +25,11 @@
   let abyssMode = false;
 
   // Abyss zoom thresholds
-  const ABYSS_FADE_START = 200;        // Black fade begins almost immediately
-  const ABYSS_FADE_END = 800;          // Fully black by 800x — stars begin here
-  const ABYSS_WORD_START = 5000;       // Word begins appearing
-  const ABYSS_WORD_FULL = 9000;        // Word fully opaque and large
-  const ABYSS_MAX_ZOOM = 10000;
+  const ABYSS_FADE_START = 80;         // Black fade begins very early
+  const ABYSS_FADE_END = 600;          // Fully black by 600x — gradual fade
+  const ABYSS_WORD_START = 2500;       // Word begins appearing
+  const ABYSS_WORD_FULL = 4500;        // Word fully opaque and large
+  const ABYSS_MAX_ZOOM = 5000;
 
   // X-Ray overlay images (loaded from base64 in xray-images.js)
   const skullImg = new Image();
@@ -1074,8 +1074,8 @@
     for (let i = 0; i < WARP_STAR_COUNT; i++) {
       const s = warpStars[i];
 
-      // Move star toward camera proportional to zoom change
-      s.z += s.speed * (1 + intensity * 12) * step * 30;
+      // Move star toward camera proportional to zoom change (gentle pace)
+      s.z += s.speed * (1 + intensity * 4) * step * 8;
 
       // Reset star when it passes the camera
       if (s.z >= 1) {
@@ -1207,7 +1207,7 @@
       const step = Math.min(0.3, zoomDelta * 50);
 
       // Warp intensity ramps up, then fades out before word
-      let warpIntensity = Math.min(1, (zoom - ABYSS_FADE_END) / 1000);
+      let warpIntensity = Math.min(1, (zoom - ABYSS_FADE_END) / 500);
       const warpFadeStart = ABYSS_WORD_START * 0.85;
       if (zoom > warpFadeStart) {
         warpIntensity *= Math.max(0, 1 - (zoom - warpFadeStart) / (ABYSS_WORD_START - warpFadeStart));
