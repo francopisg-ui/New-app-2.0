@@ -1339,27 +1339,24 @@
   function drawSkullOverlay(ctx, cx, cy, skullW, skullH, alpha) {
     if (!skullImg.complete || !skullImg.naturalWidth) return;
     ctx.save();
-    ctx.globalAlpha = alpha;
-    // Draw the skull image centered on (cx, cy), scaled to skullW x skullH
-    // Use 'screen' blend mode so the bright skull shows on the dark x-ray background
+    // Cap at 0.7 so the face always shows through the skull
+    ctx.globalAlpha = alpha * 0.7;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(skullImg, cx - skullW / 2, cy - skullH / 2, skullW, skullH);
     ctx.restore();
   }
 
-  // (old drawSkullOverlay canvas paths removed — now using image above)
-
   // --- Draw brain overlay (image-based, face-tracked) ---
   function drawBrainOverlay(ctx, cx, cy, brainW, brainH, alpha) {
     if (!brainImg.complete || !brainImg.naturalWidth) return;
     ctx.save();
-    ctx.globalAlpha = alpha;
-    // Use 'screen' blend mode for the bright brain on dark background
+    // Cap at 0.65 so brain blends smoothly over the scene
+    ctx.globalAlpha = alpha * 0.65;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(brainImg, cx - brainW / 2, cy - brainH / 2, brainW, brainH);
-    // Pulsing highlight (animated glow, preserved from original)
+    // Pulsing highlight (subtle animated glow)
     var pulseT = Date.now() * 0.002;
-    var pulseAlpha = (Math.sin(pulseT) * 0.5 + 0.5) * alpha * 0.08;
+    var pulseAlpha = (Math.sin(pulseT) * 0.5 + 0.5) * alpha * 0.05;
     var pulseGrad = ctx.createRadialGradient(cx, cy - brainH * 0.1, 0, cx, cy - brainH * 0.1, brainW * 0.5);
     pulseGrad.addColorStop(0, 'rgba(0, 255, 255, ' + pulseAlpha + ')');
     pulseGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
@@ -1401,12 +1398,12 @@
     const faceScreenX = drawX + facePosX * scale;
     const faceScreenY = drawY + facePosY * scale;
 
-    // Skull/brain size scales with zoom (sized to match the face guide circle ~220x300)
+    // Skull/brain size scales with zoom (sized to fill the face guide circle)
     const faceSize = Math.min(iw, ih) * 0.5 * scale;
-    const skullW = faceSize * 1.0;
+    const skullW = faceSize * 1.3;
     const skullH = faceSize * 1.35;
-    const brainW = faceSize * 0.8;
-    const brainH = faceSize * 0.65;
+    const brainW = faceSize * 0.9;
+    const brainH = faceSize * 0.7;
 
     // Layer progress values (0-1 each)
     const p1 = layerProgress(viewerZoom, XRAY_L1_START, XRAY_L1_END); // skin desat
@@ -1427,10 +1424,10 @@
     if (xrayIntensity > 0) {
       // Subtle blue-cyan tint that grows with x-ray intensity
       zoomCtx.save();
-      const blueAlpha = Math.min(xrayIntensity * 0.35, 0.35);
+      const blueAlpha = Math.min(xrayIntensity * 0.15, 0.15);
       zoomCtx.globalCompositeOperation = 'multiply';
       zoomCtx.globalAlpha = blueAlpha;
-      zoomCtx.fillStyle = '#5080c0';
+      zoomCtx.fillStyle = '#6090d0';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
 
@@ -1448,15 +1445,15 @@
       }
 
       // Radial vignette centered on face (dark edges, bright center)
-      const vignetteAlpha = Math.min(xrayIntensity * 0.6, 0.6);
+      const vignetteAlpha = Math.min(xrayIntensity * 0.25, 0.25);
       if (vignetteAlpha > 0.02) {
         const vigRadius = Math.max(cw, ch) * 0.7;
         const grad = zoomCtx.createRadialGradient(
-          faceScreenX, faceScreenY, vigRadius * 0.2,
+          faceScreenX, faceScreenY, vigRadius * 0.3,
           faceScreenX, faceScreenY, vigRadius
         );
         grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(0.6, 'rgba(0,0,10,' + (vignetteAlpha * 0.3) + ')');
+        grad.addColorStop(0.7, 'rgba(0,0,10,' + (vignetteAlpha * 0.2) + ')');
         grad.addColorStop(1, 'rgba(0,0,10,' + vignetteAlpha + ')');
         zoomCtx.save();
         zoomCtx.fillStyle = grad;
@@ -1471,9 +1468,9 @@
     // ========================================
     if (p1 > 0 && supportsFilter) {
       zoomCtx.save();
-      const desat = Math.round(100 - p1 * 90); // 100% -> 10% (aggressive desaturation)
-      const darkAmount = p1 * 0.3;
-      zoomCtx.globalAlpha = p1 * 0.85;
+      const desat = Math.round(100 - p1 * 60); // 100% -> 40% (gentler desaturation)
+      const darkAmount = p1 * 0.1;
+      zoomCtx.globalAlpha = p1 * 0.6;
       zoomCtx.filter = 'saturate(' + desat + '%) brightness(' + Math.round(100 - darkAmount * 100) + '%)';
       zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
       zoomCtx.filter = 'none';
@@ -1485,9 +1482,9 @@
     // Dark desaturated gray, contrast boost, "under the skin"
     // ========================================
     if (p2 > 0) {
-      // Darken overlay
+      // Darken overlay (gentle)
       zoomCtx.save();
-      zoomCtx.globalAlpha = p2 * 0.75;
+      zoomCtx.globalAlpha = p2 * 0.35;
       zoomCtx.fillStyle = '#060610';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
@@ -1495,11 +1492,11 @@
       // Re-draw photo inverted and desaturated for tissue look
       if (supportsFilter) {
         zoomCtx.save();
-        const invertAmt = Math.round(p2 * 85);
-        const satAmt = Math.round(100 - p2 * 95);
-        const contrastAmt = Math.round(100 + p2 * 100);
-        zoomCtx.globalAlpha = p2 * 0.75;
-        zoomCtx.filter = 'invert(' + invertAmt + '%) saturate(' + satAmt + '%) contrast(' + contrastAmt + '%) brightness(' + Math.round(100 + p2 * 30) + '%)';
+        const invertAmt = Math.round(p2 * 60);
+        const satAmt = Math.round(100 - p2 * 70);
+        const contrastAmt = Math.round(100 + p2 * 50);
+        zoomCtx.globalAlpha = p2 * 0.5;
+        zoomCtx.filter = 'invert(' + invertAmt + '%) saturate(' + satAmt + '%) contrast(' + contrastAmt + '%) brightness(' + Math.round(100 + p2 * 20) + '%)';
         zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
         zoomCtx.filter = 'none';
         zoomCtx.restore();
@@ -1528,19 +1525,19 @@
     // Inverted high-contrast face + drawn skull overlay
     // ========================================
     if (p3 > 0) {
-      // Full x-ray inversion of the photo (white bones on black)
+      // X-ray inversion of the photo (gentler, preserves face visibility)
       if (supportsFilter) {
         zoomCtx.save();
-        zoomCtx.globalAlpha = p3 * 0.85;
-        zoomCtx.filter = 'invert(90%) saturate(5%) contrast(200%) brightness(120%)';
+        zoomCtx.globalAlpha = p3 * 0.5;
+        zoomCtx.filter = 'invert(70%) saturate(10%) contrast(150%) brightness(130%)';
         zoomCtx.drawImage(capturedImage, drawX, drawY, drawW, drawH);
         zoomCtx.filter = 'none';
         zoomCtx.restore();
       }
 
-      // Darken non-skull areas more
+      // Darken non-skull areas (subtle)
       zoomCtx.save();
-      zoomCtx.globalAlpha = p3 * 0.5;
+      zoomCtx.globalAlpha = p3 * 0.25;
       zoomCtx.fillStyle = '#000008';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
@@ -1572,9 +1569,9 @@
     // Skull fades, dark void, brain shape appears
     // ========================================
     if (p4 > 0) {
-      // Heavy darkening - entering the void behind the skull
+      // Darkening for brain cavity (moderate)
       zoomCtx.save();
-      zoomCtx.globalAlpha = p4 * 0.8;
+      zoomCtx.globalAlpha = p4 * 0.4;
       zoomCtx.fillStyle = '#010108';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
@@ -1611,9 +1608,9 @@
     // Brain fades, word appears in bone-white with halo glow
     // ========================================
     if (p5 > 0) {
-      // Final darkening
+      // Final darkening (gentle)
       zoomCtx.save();
-      zoomCtx.globalAlpha = p5 * 0.4;
+      zoomCtx.globalAlpha = p5 * 0.2;
       zoomCtx.fillStyle = '#000';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
