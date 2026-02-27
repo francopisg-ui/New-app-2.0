@@ -1327,9 +1327,9 @@
   const XRAY_L1_END = 1.5;    // Layer 1 peaks
   const XRAY_L2_START = 1.2;  // Layer 2 starts: tissue
   const XRAY_L2_END = 1.7;    // Layer 2 peaks
-  const XRAY_L3_START = 1.4;  // Layer 3 starts: skull
+  const XRAY_L3_START = 1.3;  // Layer 3 starts: skull
   const XRAY_L3_END = 2.5;    // Layer 3 peaks (skull visible by 1.7x)
-  const XRAY_L4_START = 1.8;  // Layer 4 starts: brain cavity
+  const XRAY_L4_START = 2.0;  // Layer 4 starts: brain cavity
   const XRAY_L4_END = 3.0;    // Layer 4 peaks (brain visible by ~2.1x)
   const XRAY_L5_START = 15.0; // Layer 5 starts: word reveal begins
   const XRAY_L5_END = 30.0;   // Layer 5 fully visible (every letter clear by 30x)
@@ -1376,7 +1376,7 @@
     if (!skullImg.complete || !skullImg.naturalWidth) return;
     ctx.save();
     // Ghost-like transparency
-    ctx.globalAlpha = alpha * 0.1;
+    ctx.globalAlpha = alpha * 0.12;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(skullImg, cx - skullW / 2, cy - skullH / 2, skullW, skullH);
     ctx.restore();
@@ -1387,7 +1387,7 @@
     if (!brainImg.complete || !brainImg.naturalWidth) return;
     ctx.save();
     // Ghost-like transparency
-    ctx.globalAlpha = alpha * 0.08;
+    ctx.globalAlpha = alpha * 0.10;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(brainImg, cx - brainW / 2, cy - brainH / 2, brainW, brainH);
     // Pulsing highlight (subtle animated glow)
@@ -1436,7 +1436,7 @@
 
     // Skull/brain size scales with zoom (sized to fill the face guide circle)
     const faceSize = Math.min(iw, ih) * 0.5 * scale;
-    const skullW = faceSize * 1.5;
+    const skullW = faceSize * 1.4;
     const skullH = faceSize * 1.35;
     const brainW = faceSize * 0.9;
     const brainH = faceSize * 0.7;
