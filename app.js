@@ -1376,7 +1376,7 @@
     if (!skullImg.complete || !skullImg.naturalWidth) return;
     ctx.save();
     // Ghost-like transparency
-    ctx.globalAlpha = alpha * 0.25;
+    ctx.globalAlpha = alpha * 0.1;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(skullImg, cx - skullW / 2, cy - skullH / 2, skullW, skullH);
     ctx.restore();
@@ -1387,7 +1387,7 @@
     if (!brainImg.complete || !brainImg.naturalWidth) return;
     ctx.save();
     // Ghost-like transparency
-    ctx.globalAlpha = alpha * 0.2;
+    ctx.globalAlpha = alpha * 0.08;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(brainImg, cx - brainW / 2, cy - brainH / 2, brainW, brainH);
     // Pulsing highlight (subtle animated glow)
