@@ -941,9 +941,9 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    const SHIFT = 22; // subtle base shift
-    const BLEND = 0.45; // 45% shifted color, 55% original
-    const DITHER = 0.70; // 70% of letter pixels get shifted
+    const SHIFT = 24; // subtle base shift
+    const BLEND = 0.50; // 50/50 shifted vs original
+    const DITHER = 0.82; // 82% of letter pixels get shifted
     const gap = scale > 20 ? 1 : 0;
 
     // Seeded random for consistent dither pattern per pixel
