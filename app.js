@@ -39,10 +39,10 @@
   });
 
   // Abyss zoom thresholds
-  const ABYSS_FADE_START = 1000;       // Black fade begins (much sooner)
-  const ABYSS_FADE_END = 10000;        // Fully black by 10k
+  const ABYSS_FADE_START = 500;        // Black fade begins almost immediately
+  const ABYSS_FADE_END = 3000;         // Fully black by 3k
   const ABYSS_LAYER_RANGES = [
-    [10000, 100000],    // Layer 0 (layer2.png dupe): first wisp
+    [3000, 100000],     // Layer 0 (layer2.png dupe): first wisp
     [60000, 200000],    // Layer 1 (layer1.png): smoke wisp
     [150000, 350000],   // Layer 2 (layer2.png): haze
     [280000, 500000],   // Layer 3 (layer3.png): dense fog
@@ -1069,25 +1069,138 @@
   // --- Black Abyss Rendering ---
   let cachedAbyssWordGrid = null;
 
+  // Hyperspace warp star field
+  const WARP_STAR_COUNT = 300;
+  const warpStars = [];
+  for (let i = 0; i < WARP_STAR_COUNT; i++) {
+    warpStars.push({
+      x: (Math.random() - 0.5) * 2,  // -1 to 1 from center
+      y: (Math.random() - 0.5) * 2,
+      z: Math.random(),               // depth 0 (far) to 1 (close)
+      speed: 0.002 + Math.random() * 0.008
+    });
+  }
+  let lastWarpTime = 0;
+
+  function updateAndDrawWarp(cw, ch, intensity) {
+    // intensity: 0–1 controls speed, trail length, brightness
+    const now = performance.now();
+    const dt = lastWarpTime ? Math.min(now - lastWarpTime, 50) : 16;
+    lastWarpTime = now;
+
+    const cx = cw / 2;
+    const cy = ch / 2;
+    const maxRadius = Math.max(cw, ch) * 0.8;
+
+    // Speed multiplier increases with zoom depth
+    const speedMult = 1 + intensity * 12;
+    // Trail length increases with intensity
+    const trailLength = 0.02 + intensity * 0.15;
+
+    for (let i = 0; i < WARP_STAR_COUNT; i++) {
+      const s = warpStars[i];
+
+      // Move star toward camera (increase z)
+      s.z += s.speed * speedMult * (dt / 16);
+
+      // Reset star when it passes the camera
+      if (s.z >= 1) {
+        s.x = (Math.random() - 0.5) * 2;
+        s.y = (Math.random() - 0.5) * 2;
+        s.z = 0.01;
+        s.speed = 0.002 + Math.random() * 0.008;
+      }
+
+      // Project 3D to 2D — perspective divide
+      const perspective = 1 / (1 - s.z * 0.95);
+      const screenX = cx + s.x * perspective * maxRadius * 0.3;
+      const screenY = cy + s.y * perspective * maxRadius * 0.3;
+
+      // Skip if off screen
+      if (screenX < -50 || screenX > cw + 50 || screenY < -50 || screenY > ch + 50) continue;
+
+      // Trail: line from current position back toward center
+      const trailZ = Math.max(0.01, s.z - trailLength);
+      const trailPerspective = 1 / (1 - trailZ * 0.95);
+      const trailX = cx + s.x * trailPerspective * maxRadius * 0.3;
+      const trailY = cy + s.y * trailPerspective * maxRadius * 0.3;
+
+      // Brightness increases as star gets closer (higher z)
+      const brightness = s.z * s.z * intensity;
+      const alpha = Math.min(1, brightness * 1.5);
+      // Stars shift from white to blue-white at high speed
+      const blue = Math.floor(200 + 55 * intensity);
+      const green = Math.floor(200 + 55 * (1 - intensity * 0.3));
+
+      // Line width increases as star approaches
+      const lineWidth = 0.5 + s.z * 2.5 * intensity;
+
+      zoomCtx.save();
+      zoomCtx.strokeStyle = `rgba(${green}, ${green}, ${blue}, ${alpha})`;
+      zoomCtx.lineWidth = lineWidth;
+      zoomCtx.lineCap = 'round';
+      zoomCtx.beginPath();
+      zoomCtx.moveTo(trailX, trailY);
+      zoomCtx.lineTo(screenX, screenY);
+      zoomCtx.stroke();
+      zoomCtx.restore();
+    }
+  }
+
+  // Abyss animation loop — keeps warp stars moving continuously
+  let abyssAnimFrame = null;
+  function abyssAnimLoop() {
+    if (!abyssMode || !viewerScreen.classList.contains('active')) {
+      abyssAnimFrame = null;
+      return;
+    }
+    renderViewer();
+    abyssAnimFrame = requestAnimationFrame(abyssAnimLoop);
+  }
+
+  function startAbyssAnim() {
+    if (abyssAnimFrame) return; // already running
+    lastWarpTime = 0;
+    abyssAnimFrame = requestAnimationFrame(abyssAnimLoop);
+  }
+
+  function stopAbyssAnim() {
+    if (abyssAnimFrame) {
+      cancelAnimationFrame(abyssAnimFrame);
+      abyssAnimFrame = null;
+    }
+  }
+
   function renderAbyssEffect(cw, ch) {
     const zoom = viewerZoom;
 
-    // Phase 1: Gradual fade to black (1,000x — 10,000x)
+    // Phase 1: Gradual fade to black (500x — 3,000x)
     if (zoom >= ABYSS_FADE_START) {
       const fadeProgress = Math.min(1, (zoom - ABYSS_FADE_START) / (ABYSS_FADE_END - ABYSS_FADE_START));
       zoomCtx.fillStyle = `rgba(0, 0, 0, ${fadeProgress})`;
       zoomCtx.fillRect(0, 0, cw, ch);
     }
 
-    // Phase 2: Overlapping zoom-through smoke layers
-    // Layers accumulate like x-ray mode, then all fade out together
-    // before the word appears, returning to pure black.
+    // Once fully black, start the abyss animation loop
     if (zoom >= ABYSS_FADE_END) {
-      // Solid black base behind all layers
+      startAbyssAnim();
+
+      // Solid black base
       zoomCtx.fillStyle = '#000';
       zoomCtx.fillRect(0, 0, cw, ch);
 
-      // Global smoke fade-out: all smoke dims to black approaching ABYSS_SMOKE_CLEAR
+      // Hyperspace warp intensity ramps up with zoom depth
+      // Runs through smoke and fades out as word appears
+      let warpIntensity = Math.min(1, (zoom - ABYSS_FADE_END) / 200000);
+      // Fade warp out as word appears
+      if (zoom > ABYSS_SMOKE_CLEAR) {
+        warpIntensity *= Math.max(0, 1 - (zoom - ABYSS_SMOKE_CLEAR) / (ABYSS_WORD_START - ABYSS_SMOKE_CLEAR));
+      }
+      if (warpIntensity > 0) {
+        updateAndDrawWarp(cw, ch, warpIntensity);
+      }
+
+      // Phase 2: Overlapping zoom-through smoke layers
       const lastLayerEnd = ABYSS_LAYER_RANGES[ABYSS_LAYER_RANGES.length - 1][1];
       let smokeFade = 1;
       if (zoom > lastLayerEnd) {
@@ -1097,21 +1210,17 @@
       if (smokeFade > 0) {
         for (let i = 0; i < ABYSS_LAYER_RANGES.length; i++) {
           const [start, end] = ABYSS_LAYER_RANGES[i];
-          if (zoom < start) continue; // Layer hasn't appeared yet
+          if (zoom < start) continue;
 
           const img = abyssLayers[i];
           if (!img.complete || !img.naturalWidth) continue;
 
-          // Fade-in: opacity ramps from 0 to full during [start, end]
           const fadeIn = Math.min(1, (zoom - start) / (end - start));
-          // High alpha since PNGs are already wispy, multiplied by global smoke fade
           const layerOpacity = fadeIn * 0.85 * smokeFade;
 
-          // Zoom-through parallax: log scale so layers grow smoothly
           const zoomRatio = zoom / start;
           const layerScale = 1 + Math.log2(zoomRatio) * 0.5;
 
-          // Scale layer to cover canvas, then apply parallax scale
           const imgAspect = img.naturalWidth / img.naturalHeight;
           const canvasAspect = cw / ch;
           let baseW, baseH;
@@ -1127,7 +1236,6 @@
           const drawX = (cw - drawW) / 2;
           const drawY = (ch - drawH) / 2;
 
-          // Screen blend: overlapping layers stack additively
           zoomCtx.save();
           zoomCtx.globalCompositeOperation = 'screen';
           zoomCtx.globalAlpha = layerOpacity;
@@ -1135,16 +1243,15 @@
           zoomCtx.restore();
         }
       }
+    } else {
+      stopAbyssAnim();
     }
 
-    // Phase 3: Word emerges from pure black (1,000,000x — 2,000,000x)
-    // Smoke has cleared. Word starts as a tiny speck and grows large.
+    // Phase 3: Word emerges from pure black
     if (zoom >= ABYSS_WORD_START && secretWord) {
-      // Pure black behind the word
       zoomCtx.fillStyle = '#000';
       zoomCtx.fillRect(0, 0, cw, ch);
 
-      // Build word grid if needed
       if (!cachedAbyssWordGrid) {
         cachedAbyssWordGrid = buildWordGrid(secretWord);
       }
@@ -1154,16 +1261,11 @@
       const gridH = grid.length;
       const gridW = grid[0].length;
 
-      // Word opacity: fades in over first portion of the range
       const wordOpacity = Math.min(1, (zoom - ABYSS_WORD_START) / ((ABYSS_WORD_FULL - ABYSS_WORD_START) * 0.3));
 
-      // Word size: starts very tiny, grows to fill screen
-      // Use smooth interpolation from ABYSS_WORD_START to ABYSS_WORD_FULL
       const sizeProgress = Math.min(1, (zoom - ABYSS_WORD_START) / (ABYSS_WORD_FULL - ABYSS_WORD_START));
-      // Start at 2% of screen, grow to 80% of screen
       const tinySize = Math.min(cw, ch) * 0.02 / Math.max(gridW, gridH);
       const fullSize = Math.min(cw, ch) * 0.8 / Math.max(gridW, gridH);
-      // Ease-out curve so it accelerates then settles
       const eased = 1 - Math.pow(1 - sizeProgress, 2);
       const pixelSize = tinySize + (fullSize - tinySize) * eased;
 
@@ -2196,6 +2298,7 @@
     if (meltAnimFrame) cancelAnimationFrame(meltAnimFrame);
     isAutoZooming = false;
     if (autoZoomAnimFrame) cancelAnimationFrame(autoZoomAnimFrame);
+    stopAbyssAnim();
     showScreen(cameraScreen);
   });
 
@@ -2257,6 +2360,7 @@
       if (meltAnimFrame) cancelAnimationFrame(meltAnimFrame);
       isAutoZooming = false;
       if (autoZoomAnimFrame) cancelAnimationFrame(autoZoomAnimFrame);
+      stopAbyssAnim();
       thumbnailPreview.style.backgroundImage = '';
       thumbnailPreview.classList.remove('has-photo');
       secretInput.value = '';
