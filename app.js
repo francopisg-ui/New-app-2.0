@@ -1293,10 +1293,10 @@
   const XRAY_L2_END = 1.7;    // Layer 2 peaks
   const XRAY_L3_START = 1.4;  // Layer 3 starts: skull
   const XRAY_L3_END = 2.5;    // Layer 3 peaks (skull visible by 1.7x)
-  const XRAY_L4_START = 2.5;  // Layer 4 starts: brain cavity
-  const XRAY_L4_END = 5.0;    // Layer 4 peaks (brain visible by 3.5x)
-  const XRAY_L5_START = 50.0; // Layer 5 starts: word reveal
-  const XRAY_L5_END = 70.0;   // Layer 5 fully visible (~65x)
+  const XRAY_L4_START = 1.8;  // Layer 4 starts: brain cavity
+  const XRAY_L4_END = 3.0;    // Layer 4 peaks (brain visible by ~2.1x)
+  const XRAY_L5_START = 35.0; // Layer 5 starts: word reveal begins
+  const XRAY_L5_END = 50.0;   // Layer 5 fully visible (every letter clear by 50x)
 
   // Grain texture canvas (generated once, reused)
   let grainCanvas = null;
@@ -1339,8 +1339,8 @@
   function drawSkullOverlay(ctx, cx, cy, skullW, skullH, alpha) {
     if (!skullImg.complete || !skullImg.naturalWidth) return;
     ctx.save();
-    // Very transparent so the face shows through clearly
-    ctx.globalAlpha = alpha * 0.4;
+    // Ghost-like transparency
+    ctx.globalAlpha = alpha * 0.25;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(skullImg, cx - skullW / 2, cy - skullH / 2, skullW, skullH);
     ctx.restore();
@@ -1350,8 +1350,8 @@
   function drawBrainOverlay(ctx, cx, cy, brainW, brainH, alpha) {
     if (!brainImg.complete || !brainImg.naturalWidth) return;
     ctx.save();
-    // Very transparent so the scene shows through clearly
-    ctx.globalAlpha = alpha * 0.35;
+    // Ghost-like transparency
+    ctx.globalAlpha = alpha * 0.2;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(brainImg, cx - brainW / 2, cy - brainH / 2, brainW, brainH);
     // Pulsing highlight (subtle animated glow)
@@ -1580,74 +1580,62 @@
     if (p5 > 0) {
       // Dark backdrop behind word so it stands out clearly
       zoomCtx.save();
-      zoomCtx.globalAlpha = p5 * 0.6;
+      zoomCtx.globalAlpha = p5 * 0.85;
       zoomCtx.fillStyle = '#000';
       zoomCtx.fillRect(0, 0, cw, ch);
       zoomCtx.restore();
 
       // Fading brain
       if (p4 > 0) {
-        const fadingBrain = Math.max(0, 1 - p5 * 0.8);
+        const fadingBrain = Math.max(0, 1 - p5);
         if (fadingBrain > 0) {
           const brainY = faceScreenY - skullH * 0.15;
           drawBrainOverlay(zoomCtx, faceScreenX, brainY, brainW, brainH, fadingBrain * p4);
         }
       }
 
-      // Word reveal - bright white, large, high contrast
-      const wordGrid = cachedWordGrid || (cachedWordGrid = buildWordGrid(secretWord));
-      if (wordGrid && wordGrid.length > 0) {
-        const gridH = wordGrid.length;
-        const gridW = wordGrid[0].length;
-
-        // Position: centered on face
+      // Word reveal - crisp canvas text, high contrast
+      if (secretWord) {
         const wordCenterX = faceScreenX;
         const wordCenterY = faceScreenY + skullH * 0.05;
 
-        const wordPixelScale = scale * 1.5;
-        const totalW = gridW * wordPixelScale;
-        const totalH = gridH * wordPixelScale;
-        const wordStartX = wordCenterX - totalW / 2;
-        const wordStartY = wordCenterY - totalH / 2;
+        // Font size scales with zoom so the word is large and readable
+        const fontSize = Math.max(24, faceSize * 0.18);
 
-        // Strong outer glow (large soft halo)
+        // Pass 1: strong glow halo behind text
         zoomCtx.save();
-        zoomCtx.globalAlpha = p5 * 0.6;
-        zoomCtx.shadowColor = 'rgba(255, 255, 255, ' + (p5 * 0.9) + ')';
-        zoomCtx.shadowBlur = 50 * p5;
-        zoomCtx.fillStyle = 'rgba(255, 255, 255, ' + (p5 * 0.5) + ')';
-        for (let gy = 0; gy < gridH; gy++) {
-          for (let gx = 0; gx < gridW; gx++) {
-            if (wordGrid[gy][gx] === 1) {
-              zoomCtx.fillRect(
-                wordStartX + gx * wordPixelScale - wordPixelScale * 0.4,
-                wordStartY + gy * wordPixelScale - wordPixelScale * 0.4,
-                wordPixelScale * 1.8,
-                wordPixelScale * 1.8
-              );
-            }
-          }
-        }
+        zoomCtx.globalAlpha = p5 * 0.8;
+        zoomCtx.font = 'bold ' + Math.round(fontSize) + 'px Arial, Helvetica, sans-serif';
+        zoomCtx.textAlign = 'center';
+        zoomCtx.textBaseline = 'middle';
+        zoomCtx.shadowColor = '#ffffff';
+        zoomCtx.shadowBlur = 40;
+        zoomCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        zoomCtx.fillText(secretWord.toUpperCase(), wordCenterX, wordCenterY);
+        zoomCtx.fillText(secretWord.toUpperCase(), wordCenterX, wordCenterY);
         zoomCtx.restore();
 
-        // Main word - bright white, full opacity
+        // Pass 2: solid white text, full opacity
         zoomCtx.save();
         zoomCtx.globalAlpha = p5;
-        zoomCtx.shadowColor = 'rgba(255, 255, 255, ' + p5 + ')';
-        zoomCtx.shadowBlur = 20 * p5;
-        for (let gy = 0; gy < gridH; gy++) {
-          for (let gx = 0; gx < gridW; gx++) {
-            if (wordGrid[gy][gx] === 1) {
-              zoomCtx.fillStyle = '#ffffff';
-              zoomCtx.fillRect(
-                wordStartX + gx * wordPixelScale,
-                wordStartY + gy * wordPixelScale,
-                wordPixelScale,
-                wordPixelScale
-              );
-            }
-          }
-        }
+        zoomCtx.font = 'bold ' + Math.round(fontSize) + 'px Arial, Helvetica, sans-serif';
+        zoomCtx.textAlign = 'center';
+        zoomCtx.textBaseline = 'middle';
+        zoomCtx.fillStyle = '#ffffff';
+        zoomCtx.shadowColor = '#ffffff';
+        zoomCtx.shadowBlur = 10;
+        zoomCtx.fillText(secretWord.toUpperCase(), wordCenterX, wordCenterY);
+        zoomCtx.restore();
+
+        // Pass 3: black outline for extra contrast/legibility
+        zoomCtx.save();
+        zoomCtx.globalAlpha = p5 * 0.9;
+        zoomCtx.font = 'bold ' + Math.round(fontSize) + 'px Arial, Helvetica, sans-serif';
+        zoomCtx.textAlign = 'center';
+        zoomCtx.textBaseline = 'middle';
+        zoomCtx.strokeStyle = '#000000';
+        zoomCtx.lineWidth = Math.max(1, fontSize * 0.06);
+        zoomCtx.strokeText(secretWord.toUpperCase(), wordCenterX, wordCenterY);
         zoomCtx.restore();
       }
     }
