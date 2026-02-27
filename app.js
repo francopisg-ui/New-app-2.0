@@ -27,8 +27,10 @@
   // Abyss zoom thresholds
   const ABYSS_FADE_START = 80;         // Black fade begins very early
   const ABYSS_FADE_END = 1000;         // Fully black by 1000x — very gradual fade
-  const ABYSS_WORD_START = 2500;       // Word begins appearing
-  const ABYSS_WORD_FULL = 4500;        // Word fully opaque and large
+  const ABYSS_BRAIN_START = 2000;      // Brain appears from the void
+  const ABYSS_BRAIN_FULL = 3200;       // Brain fills most of the screen
+  const ABYSS_WORD_START = 3400;       // Word begins appearing inside brain
+  const ABYSS_WORD_FULL = 4800;        // Word fully visible
   const ABYSS_MAX_ZOOM = 5000;
 
   // X-Ray overlay image (loaded from base64 in xray-images.js)
@@ -1225,11 +1227,11 @@
       const zoomDelta = Math.abs(zoom - lastWarpZoom) / zoom;
       const step = Math.min(0.3, zoomDelta * 50);
 
-      // Warp intensity ramps up, then fades out before word
+      // Warp intensity ramps up, then fades out before brain
       let warpIntensity = Math.min(1, (zoom - ABYSS_FADE_END) / 500);
-      const warpFadeStart = ABYSS_WORD_START * 0.85;
+      const warpFadeStart = ABYSS_BRAIN_START * 0.85;
       if (zoom > warpFadeStart) {
-        warpIntensity *= Math.max(0, 1 - (zoom - warpFadeStart) / (ABYSS_WORD_START - warpFadeStart));
+        warpIntensity *= Math.max(0, 1 - (zoom - warpFadeStart) / (ABYSS_BRAIN_START - warpFadeStart));
       }
       if (warpIntensity > 0) {
         updateAndDrawWarp(cw, ch, warpIntensity);
@@ -1237,11 +1239,75 @@
       }
     }
 
-    // Phase 3: Word emerges from pure black
-    if (zoom >= ABYSS_WORD_START && secretWord) {
+    // Phase 3: Brain approaches from the void
+    if (zoom >= ABYSS_BRAIN_START && brainImg.complete && brainImg.naturalWidth) {
       zoomCtx.fillStyle = '#000';
       zoomCtx.fillRect(0, 0, cw, ch);
 
+      const brainProg = Math.min(1, (zoom - ABYSS_BRAIN_START) / (ABYSS_BRAIN_FULL - ABYSS_BRAIN_START));
+      const brainEased = 1 - Math.pow(1 - brainProg, 2);
+
+      // Brain grows from a tiny speck to filling ~70% of the screen
+      const minDim = Math.min(cw, ch);
+      const tinyBrain = minDim * 0.03;
+      const fullBrain = minDim * 0.7;
+      const brainSize = tinyBrain + (fullBrain - tinyBrain) * brainEased;
+
+      // Maintain aspect ratio of the brain image
+      const aspect = brainImg.naturalWidth / brainImg.naturalHeight;
+      const bw = aspect >= 1 ? brainSize : brainSize * aspect;
+      const bh = aspect >= 1 ? brainSize / aspect : brainSize;
+      const bx = (cw - bw) / 2;
+      const by = (ch - bh) / 2;
+
+      // Fade in opacity
+      const brainAlpha = Math.min(1, brainProg / 0.25);
+
+      zoomCtx.save();
+      zoomCtx.globalAlpha = brainAlpha * 0.85;
+      zoomCtx.drawImage(brainImg, bx, by, bw, bh);
+
+      // Subtle pulsing glow around the brain
+      const pulseT = Date.now() * 0.0015;
+      const pulseAlpha = (Math.sin(pulseT) * 0.5 + 0.5) * brainAlpha * 0.08;
+      const glowGrad = zoomCtx.createRadialGradient(cw / 2, ch / 2, brainSize * 0.2, cw / 2, ch / 2, brainSize * 0.6);
+      glowGrad.addColorStop(0, 'rgba(180, 60, 80, ' + pulseAlpha + ')');
+      glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      zoomCtx.globalCompositeOperation = 'screen';
+      zoomCtx.globalAlpha = 1;
+      zoomCtx.fillStyle = glowGrad;
+      zoomCtx.fillRect(0, 0, cw, ch);
+      zoomCtx.restore();
+    }
+
+    // Phase 4: Word subtly revealed inside the brain (x-ray style)
+    if (zoom >= ABYSS_WORD_START && secretWord && brainImg.complete && brainImg.naturalWidth) {
+      // Continue drawing the brain at full size as background
+      zoomCtx.fillStyle = '#000';
+      zoomCtx.fillRect(0, 0, cw, ch);
+
+      const minDim = Math.min(cw, ch);
+      const fullBrain = minDim * 0.7;
+
+      // Brain keeps growing slightly past full, simulating zoom-in
+      const zoomInProg = Math.min(1, (zoom - ABYSS_WORD_START) / (ABYSS_WORD_FULL - ABYSS_WORD_START));
+      const zoomEased = 1 - Math.pow(1 - zoomInProg, 2);
+      const brainSize = fullBrain * (1 + zoomEased * 1.5); // grows to 2.5x
+
+      const aspect = brainImg.naturalWidth / brainImg.naturalHeight;
+      const bw = aspect >= 1 ? brainSize : brainSize * aspect;
+      const bh = aspect >= 1 ? brainSize / aspect : brainSize;
+      const bx = (cw - bw) / 2;
+      const by = (ch - bh) / 2;
+
+      // Brain fades slightly as word emerges
+      const brainFade = 1 - zoomInProg * 0.4;
+      zoomCtx.save();
+      zoomCtx.globalAlpha = 0.85 * brainFade;
+      zoomCtx.drawImage(brainImg, bx, by, bw, bh);
+      zoomCtx.restore();
+
+      // Build word grid if needed
       if (!cachedAbyssWordGrid) {
         cachedAbyssWordGrid = buildWordGrid(secretWord);
       }
@@ -1251,26 +1317,30 @@
       const gridH = grid.length;
       const gridW = grid[0].length;
 
-      const wordOpacity = Math.min(1, (zoom - ABYSS_WORD_START) / ((ABYSS_WORD_FULL - ABYSS_WORD_START) * 0.3));
+      // Word fades in subtly
+      const wordOpacity = Math.min(1, (zoom - ABYSS_WORD_START) / ((ABYSS_WORD_FULL - ABYSS_WORD_START) * 0.4));
 
-      const sizeProgress = Math.min(1, (zoom - ABYSS_WORD_START) / (ABYSS_WORD_FULL - ABYSS_WORD_START));
-      const tinySize = Math.min(cw, ch) * 0.02 / Math.max(gridW, gridH);
-      const fullSize = Math.min(cw, ch) * 0.8 / Math.max(gridW, gridH);
-      const eased = 1 - Math.pow(1 - sizeProgress, 2);
-      const pixelSize = tinySize + (fullSize - tinySize) * eased;
+      // Word size grows within the brain
+      const wordSizeProg = Math.min(1, (zoom - ABYSS_WORD_START) / (ABYSS_WORD_FULL - ABYSS_WORD_START));
+      const wordEased = 1 - Math.pow(1 - wordSizeProg, 2);
+      const tinySize = minDim * 0.02 / Math.max(gridW, gridH);
+      const fullSize = minDim * 0.5 / Math.max(gridW, gridH);
+      const pixelSize = tinySize + (fullSize - tinySize) * wordEased;
 
       const totalW = gridW * pixelSize;
       const totalH = gridH * pixelSize;
       const offsetX = (cw - totalW) / 2;
       const offsetY = (ch - totalH) / 2;
 
+      // Subtle x-ray style: soft white with slight cyan tint
       zoomCtx.save();
-      zoomCtx.globalAlpha = wordOpacity;
+      zoomCtx.globalAlpha = wordOpacity * 0.7;
+      zoomCtx.globalCompositeOperation = 'screen';
 
       for (let row = 0; row < gridH; row++) {
         for (let col = 0; col < gridW; col++) {
           if (grid[row][col] !== 1) continue;
-          zoomCtx.fillStyle = '#fff';
+          zoomCtx.fillStyle = 'rgba(220, 230, 240, 1)';
           zoomCtx.fillRect(
             offsetX + col * pixelSize,
             offsetY + row * pixelSize,
