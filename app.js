@@ -2432,19 +2432,27 @@
     meltData = null;
     if (meltAnimFrame) cancelAnimationFrame(meltAnimFrame);
 
+    // Stop camera so iOS Dynamic Island indicator goes away
+    if (currentStream) {
+      currentStream.getTracks().forEach(t => t.stop());
+      currentStream = null;
+    }
+
     showScreen(viewerScreen);
     resizeViewerCanvas();
     renderViewer();
   });
 
   // --- Back Button ---
-  backBtn.addEventListener('click', () => {
+  backBtn.addEventListener('click', async () => {
     isMelting = false;
     meltData = null;
     if (meltAnimFrame) cancelAnimationFrame(meltAnimFrame);
     isAutoZooming = false;
     if (autoZoomAnimFrame) cancelAnimationFrame(autoZoomAnimFrame);
     showScreen(cameraScreen);
+    // Restart camera since it was stopped when entering viewer
+    await startCamera();
   });
 
   // --- Window Resize ---
