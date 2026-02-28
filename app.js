@@ -83,6 +83,14 @@
   const SECRET_REVEAL_THRESHOLD = 3;
   const SECRET_FULL_OPACITY_ZOOM = 15;
 
+  // Reveal settings (configurable from startup screen)
+  let revealShift = 18;       // pixel brightness shift (2-60)
+  let revealDither = 0.95;    // fraction of letter pixels rendered (0.30-1.0)
+  let revealBlend = 0.50;     // shifted vs original mix ratio (0.10-1.0)
+  let revealEdgeCurve = 2;    // edge softness power: 0=none, 1=linear, 2=squared, 3=cubed
+  let revealNoise = 0.20;     // per-pixel noise range ±  (0.0-0.60)
+  let revealEmbedStrength = 65; // embed shift baked into photo (10-120)
+
   // Pixel reveal config
   const PIXEL_FONT = {
     'A': [
@@ -417,6 +425,16 @@
   // Black Abyss mode DOM
   const abyssModeBtn = document.getElementById('abyss-mode-btn');
 
+  // Reveal Settings DOM
+  const settingsToggle = document.getElementById('settings-toggle');
+  const settingsPanel = document.getElementById('settings-panel');
+  const shiftSlider = document.getElementById('shift-slider');
+  const ditherSlider = document.getElementById('dither-slider');
+  const blendSlider = document.getElementById('blend-slider');
+  const edgeSlider = document.getElementById('edge-slider');
+  const noiseSlider = document.getElementById('noise-slider');
+  const embedSlider = document.getElementById('embed-slider');
+
   // Card mode DOM
   const cardModeBtn = document.getElementById('card-mode-btn');
   const cardSuitScreen = document.getElementById('card-suit-screen');
@@ -662,6 +680,38 @@
     startCamera();
   });
 
+  // --- Reveal Settings ---
+  const edgeLabels = ['None', 'Low', 'High', 'Max'];
+  settingsToggle.addEventListener('click', () => {
+    settingsToggle.classList.toggle('open');
+    settingsPanel.classList.toggle('hidden');
+  });
+
+  shiftSlider.addEventListener('input', () => {
+    revealShift = parseInt(shiftSlider.value);
+    document.getElementById('shift-value').textContent = revealShift;
+  });
+  ditherSlider.addEventListener('input', () => {
+    revealDither = parseInt(ditherSlider.value) / 100;
+    document.getElementById('dither-value').textContent = ditherSlider.value + '%';
+  });
+  blendSlider.addEventListener('input', () => {
+    revealBlend = parseInt(blendSlider.value) / 100;
+    document.getElementById('blend-value').textContent = blendSlider.value + '%';
+  });
+  edgeSlider.addEventListener('input', () => {
+    revealEdgeCurve = parseInt(edgeSlider.value);
+    document.getElementById('edge-value').textContent = edgeLabels[revealEdgeCurve];
+  });
+  noiseSlider.addEventListener('input', () => {
+    revealNoise = parseInt(noiseSlider.value) / 100;
+    document.getElementById('noise-value').textContent = noiseSlider.value + '%';
+  });
+  embedSlider.addEventListener('input', () => {
+    revealEmbedStrength = parseInt(embedSlider.value);
+    document.getElementById('embed-value').textContent = revealEmbedStrength;
+  });
+
   // --- Camera ---
   async function startCamera() {
     if (currentStream) {
@@ -829,7 +879,7 @@
 
     // Per-pixel adaptive embedding: each text pixel samples its 3x3 neighbors
     // and shifts slightly to blend with surroundings
-    const EMBED_SHIFT = 65;
+    const EMBED_SHIFT = revealEmbedStrength;
 
     // Write the word grid into the image with per-pixel neighbor blending
     for (let gy = 0; gy < gridH; gy++) {
@@ -1360,7 +1410,7 @@
               for (let x = 0; x < gw; x++) {
                 if (cachedAbyssWordGrid[y][x] === 1) {
                   const t = cachedAbyssEdgeGrid[y][x] / maxDist;
-                  cachedAbyssEdgeGrid[y][x] = 0.02 + 0.98 * (t * t);
+                  cachedAbyssEdgeGrid[y][x] = revealEdgeCurve === 0 ? 1 : 0.02 + 0.98 * Math.pow(t, revealEdgeCurve);
                 }
               }
             }
@@ -1391,10 +1441,10 @@
       const offsetX = (cw - totalW) / 2;
       const offsetY = (ch - totalH) / 2;
 
-      // X-ray constants (subtle shift to blend with brain texture)
-      const SHIFT = 12;
-      const BLEND = 0.65;
-      const DITHER = 0.87;
+      // Abyss word constants (use half-strength shift to blend with brain texture)
+      const SHIFT = Math.round(revealShift * 0.67);
+      const BLEND = revealBlend;
+      const DITHER = revealDither;
 
       function seededRand(x, y) {
         let h = (x * 374761393 + y * 668265263 + 1274126177) | 0;
@@ -1427,8 +1477,8 @@
           const origB = brainPixelData.data[idx + 2];
           const brightness = (origR + origG + origB) / 3;
 
-          // Per-pixel noise on shift amount ±20%
-          const noise = 0.8 + seededRand(gx + 999, gy + 777) * 0.4;
+          // Per-pixel noise on shift amount
+          const noise = (1 - revealNoise) + seededRand(gx + 999, gy + 777) * (revealNoise * 2);
           const shift = Math.round(SHIFT * ef * noise);
 
           let sr, sg, sb;
@@ -1545,13 +1595,13 @@
           }
         }
 
-        // Normalize with squared curve: edges nearly invisible, only deep interior gets full shift
+        // Normalize with configurable curve: edges nearly invisible, only deep interior gets full shift
         if (maxDist > 0) {
           for (let y = 0; y < gh; y++) {
             for (let x = 0; x < gw; x++) {
               if (cachedWordGrid[y][x] === 1) {
                 const t = cachedEdgeGrid[y][x] / maxDist;
-                cachedEdgeGrid[y][x] = 0.02 + 0.98 * (t * t);
+                cachedEdgeGrid[y][x] = revealEdgeCurve === 0 ? 1 : 0.02 + 0.98 * Math.pow(t, revealEdgeCurve);
               }
             }
           }
@@ -1571,9 +1621,9 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    const SHIFT = 18; // subtle base shift
-    const BLEND = 0.50; // 50/50 shifted vs original
-    const DITHER = 0.95; // 95% of letter pixels get shifted
+    const SHIFT = revealShift;
+    const BLEND = revealBlend;
+    const DITHER = revealDither;
     const gap = scale > 20 ? 1 : 0;
 
     // Seeded random for consistent dither pattern per pixel
@@ -1603,8 +1653,8 @@
             const origB = data[idx + 2];
             const brightness = (origR + origG + origB) / 3;
 
-            // Per-pixel noise: randomize shift amount ±20%
-            const noise = 0.8 + seededRand(px + 999, py + 777) * 0.4;
+            // Per-pixel noise: randomize shift amount
+            const noise = (1 - revealNoise) + seededRand(px + 999, py + 777) * (revealNoise * 2);
             const shift = Math.round(SHIFT * ef * noise);
 
             let sr, sg, sb;
@@ -1733,7 +1783,7 @@
     const startY = imgCenterY - Math.floor(gridH / 2);
 
     const data = capturedImageData.data;
-    const SHIFT = 30;
+    const SHIFT = Math.round(revealShift * 1.67);
     const gap = scale > 20 ? 1 : 0;
 
     function seededRand(x, y) {
@@ -2083,7 +2133,7 @@
           for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) if (cachedEdgeGrid[y][x] > maxDist) maxDist = cachedEdgeGrid[y][x];
           if (maxDist > 0) {
             for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
-              if (wordGrid[y][x] === 1) { const t = cachedEdgeGrid[y][x] / maxDist; cachedEdgeGrid[y][x] = 0.02 + 0.98 * (t * t); }
+              if (wordGrid[y][x] === 1) { const t = cachedEdgeGrid[y][x] / maxDist; cachedEdgeGrid[y][x] = revealEdgeCurve === 0 ? 1 : 0.02 + 0.98 * Math.pow(t, revealEdgeCurve); }
             }
           }
         }
@@ -2099,9 +2149,9 @@
         const startPX = imgCenterX - Math.floor(gridW / 2);
         const startPY = imgCenterY - Math.floor(gridH / 2);
 
-        const SHIFT = 9;
-        const BLEND = 0.50;
-        const DITHER = 0.95;
+        const SHIFT = Math.round(revealShift / 2);
+        const BLEND = revealBlend;
+        const DITHER = revealDither;
         const gap = scale > 20 ? 1 : 0;
 
         function seededRand(x, y) {
@@ -2177,7 +2227,7 @@
                 const origB = Math.round(c[2] * 0.30 + cL[2] * 0.10 + cR[2] * 0.10 + cU[2] * 0.10 + cD[2] * 0.10 + cUL[2] * 0.075 + cUR[2] * 0.075 + cDL[2] * 0.075 + cDR[2] * 0.075);
                 const brightness = (origR + origG + origB) / 3;
 
-                const noise = 0.8 + seededRand(px + 999, py + 777) * 0.4;
+                const noise = (1 - revealNoise) + seededRand(px + 999, py + 777) * (revealNoise * 2);
                 const shift = Math.round(SHIFT * ef * noise);
 
                 let sr, sg, sb;

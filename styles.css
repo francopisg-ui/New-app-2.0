@@ -199,6 +199,106 @@ html, body {
   opacity: 0.7;
 }
 
+/* ========== REVEAL SETTINGS ========== */
+.settings-divider {
+  width: 60%;
+  height: 1px;
+  background: #333;
+  margin: 4px 0;
+}
+
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  color: #8e8e93;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+}
+
+.settings-toggle:active {
+  opacity: 0.6;
+}
+
+.settings-chevron {
+  transition: transform 0.25s;
+}
+
+.settings-toggle.open .settings-chevron {
+  transform: rotate(180deg);
+}
+
+.settings-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.setting-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.setting-value {
+  color: #8e8e93;
+  font-weight: 400;
+}
+
+.setting-desc {
+  font-size: 11px;
+  color: #636366;
+  line-height: 1.3;
+}
+
+.setting-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: #39393d;
+  outline: none;
+}
+
+.setting-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+.setting-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
 #card-suit-screen,
 #card-value-screen {
   background: #000;

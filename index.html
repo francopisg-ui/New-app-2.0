@@ -34,6 +34,45 @@
       <button id="card-mode-btn" class="secret-submit card-mode-btn">Card Mode</button>
       <button id="xray-mode-btn" class="secret-submit xray-mode-btn">X-Ray Mode</button>
       <button id="abyss-mode-btn" class="secret-submit abyss-mode-btn">Black Abyss</button>
+
+      <!-- Reveal Settings -->
+      <div class="settings-divider"></div>
+      <button class="settings-toggle" id="settings-toggle">
+        <span class="settings-toggle-label">Reveal Settings</span>
+        <svg class="settings-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="settings-panel hidden" id="settings-panel">
+        <div class="setting-row">
+          <label class="setting-label">Shift <span class="setting-value" id="shift-value">18</span></label>
+          <input type="range" class="setting-slider" id="shift-slider" min="2" max="60" value="18">
+          <div class="setting-desc">How visible the word is against the background</div>
+        </div>
+        <div class="setting-row">
+          <label class="setting-label">Dither <span class="setting-value" id="dither-value">95%</span></label>
+          <input type="range" class="setting-slider" id="dither-slider" min="30" max="100" value="95">
+          <div class="setting-desc">% of letter pixels that render (lower = grainier)</div>
+        </div>
+        <div class="setting-row">
+          <label class="setting-label">Blend <span class="setting-value" id="blend-value">50%</span></label>
+          <input type="range" class="setting-slider" id="blend-slider" min="10" max="100" value="50">
+          <div class="setting-desc">Mix ratio of shifted vs original color</div>
+        </div>
+        <div class="setting-row">
+          <label class="setting-label">Edge Softness <span class="setting-value" id="edge-value">High</span></label>
+          <input type="range" class="setting-slider" id="edge-slider" min="0" max="3" value="2">
+          <div class="setting-desc">How much letter edges fade out</div>
+        </div>
+        <div class="setting-row">
+          <label class="setting-label">Noise <span class="setting-value" id="noise-value">20%</span></label>
+          <input type="range" class="setting-slider" id="noise-slider" min="0" max="60" value="20">
+          <div class="setting-desc">Random per-pixel variation (higher = more organic)</div>
+        </div>
+        <div class="setting-row">
+          <label class="setting-label">Embed Strength <span class="setting-value" id="embed-value">65</span></label>
+          <input type="range" class="setting-slider" id="embed-slider" min="10" max="120" value="65">
+          <div class="setting-desc">How strongly the word is baked into the photo</div>
+        </div>
+      </div>
     </div>
   </div>
 
