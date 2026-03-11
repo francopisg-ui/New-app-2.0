@@ -1889,13 +1889,12 @@
   function drawBrainOverlay(ctx, cx, cy, brainW, brainH, alpha) {
     if (!brainImg.complete || !brainImg.naturalWidth) return;
     ctx.save();
-    // Ghost-like transparency (15% more transparent than original)
-    ctx.globalAlpha = alpha * 0.102;
+    ctx.globalAlpha = alpha * 0.85;
     ctx.globalCompositeOperation = 'screen';
     ctx.drawImage(brainImg, cx - brainW / 2, cy - brainH / 2, brainW, brainH);
     // Pulsing highlight (subtle animated glow)
     var pulseT = Date.now() * 0.002;
-    var pulseAlpha = (Math.sin(pulseT) * 0.5 + 0.5) * alpha * 0.05;
+    var pulseAlpha = (Math.sin(pulseT) * 0.5 + 0.5) * alpha * 0.15;
     var pulseGrad = ctx.createRadialGradient(cx, cy - brainH * 0.1, 0, cx, cy - brainH * 0.1, brainW * 0.5);
     pulseGrad.addColorStop(0, 'rgba(0, 255, 255, ' + pulseAlpha + ')');
     pulseGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
@@ -2309,10 +2308,10 @@
     const baseScale = Math.max(cw / iw, ch / ih);
 
     const targetPos = wordEmbedPosition || { x: iw / 2, y: ih / 2 };
-    const targetZoom = 25;
-    const zoomInDuration = 3000;
-    const pauseDuration = 1500;
-    const zoomOutDuration = 2000;
+    const targetZoom = abyssMode ? 3000 : 25;
+    const zoomInDuration = abyssMode ? 6000 : 3000;
+    const pauseDuration = abyssMode ? 2000 : 1500;
+    const zoomOutDuration = abyssMode ? 3000 : 2000;
     const totalDuration = zoomInDuration + pauseDuration + zoomOutDuration;
     const startTime = performance.now();
 
